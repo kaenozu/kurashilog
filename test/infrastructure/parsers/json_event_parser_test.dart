@@ -45,10 +45,22 @@ void main() {
   });
 
   test('rejects trailing data and malformed containers', () {
-    final trailing = JsonEventParser()..addChunk(utf8.encode('{} {}'));
-    expect(trailing.finish, throwsA(isA<JsonParseException>()));
+    expect(
+      () {
+        final parser = JsonEventParser();
+        parser.addChunk(utf8.encode('{} {}'));
+        parser.finish();
+      },
+      throwsA(isA<JsonParseException>()),
+    );
 
-    final malformed = JsonEventParser()..addChunk(utf8.encode('{"a":]'));
-    expect(malformed.finish, throwsA(isA<JsonParseException>()));
+    expect(
+      () {
+        final parser = JsonEventParser();
+        parser.addChunk(utf8.encode('{"a":]'));
+        parser.finish();
+      },
+      throwsA(isA<JsonParseException>()),
+    );
   });
 }
