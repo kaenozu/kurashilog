@@ -2,8 +2,9 @@ name: Publish PR 1 acceptance APK
 
 on:
   push:
-    branches:
-      - agent/pr1-acceptance-release
+    branches: [agent/pr1-acceptance-release]
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.event_name == 'push' || github.head_ref == 'agent/pr1-acceptance-release'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -23,7 +25,7 @@ jobs:
       RELEASE_TAG: pr1-acceptance-20260802-15a9cd5
       RELEASE_TITLE: Kurashilog PR #1 acceptance build (15a9cd5)
     steps:
-      - name: Check out the exact PR head
+      - name: Check out exact PR head
         uses: actions/checkout@v4
         with:
           ref: ${{ env.SOURCE_SHA }}
@@ -34,34 +36,20 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore missing Flutter wrapper files
+      - name: Validate and build
         shell: bash
         run: |
+          set -euo pipefail
           flutter create --platforms=android --project-name kurashilog .
           rm -f test/widget_test.dart
-
-      - name: Resolve dependencies
-        run: flutter pub get
-
-      - name: Validate source
-        shell: bash
-        run: |
+          flutter pub get
           dart format --output=none --set-exit-if-changed lib test
           flutter analyze
           flutter test
-
-      - name: Build release APK
-        run: flutter build apk --release
-
-      - name: Assert release manifest has no INTERNET permission
-        shell: bash
-        run: |
+          flutter build apk --release
           manifest="$(find build/app/intermediates -path '*release*' -name AndroidManifest.xml | head -n 1)"
           test -n "$manifest"
-          if grep -q 'android.permission.INTERNET' "$manifest"; then
-            echo "Release manifest unexpectedly contains INTERNET permission: $manifest"
-            exit 1
-          fi
+          ! grep -q 'android.permission.INTERNET' "$manifest"
 
       - name: Test-sign acceptance APK
         id: package
@@ -70,37 +58,23 @@ jobs:
           set -euo pipefail
           source_apk="build/app/outputs/flutter-apk/app-release.apk"
           test -f "$source_apk"
-
           build_tools_version="$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
           apksigner="$ANDROID_HOME/build-tools/$build_tools_version/apksigner"
           test -x "$apksigner"
-
           keystore="$RUNNER_TEMP/kurashilog-acceptance.keystore"
-          keytool -genkeypair \
-            -keystore "$keystore" \
-            -storepass acceptance \
-            -keypass acceptance \
-            -alias acceptance \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 30 \
+          keytool -genkeypair -keystore "$keystore" -storepass acceptance -keypass acceptance \
+            -alias acceptance -keyalg RSA -keysize 2048 -validity 30 \
             -dname "CN=Kurashilog Acceptance, OU=Testing, O=kaenozu, L=Tokyo, ST=Tokyo, C=JP"
-
           asset="kurashilog-pr1-${SHORT_SHA}-acceptance.apk"
           checksum="${asset}.sha256"
-          "$apksigner" sign \
-            --ks "$keystore" \
-            --ks-pass pass:acceptance \
-            --key-pass pass:acceptance \
-            --out "$asset" \
-            "$source_apk"
+          "$apksigner" sign --ks "$keystore" --ks-pass pass:acceptance --key-pass pass:acceptance \
+            --out "$asset" "$source_apk"
           "$apksigner" verify --verbose --print-certs "$asset"
           sha256sum "$asset" > "$checksum"
-
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
           echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
 
-      - name: Create or update GitHub prerelease
+      - name: Publish prerelease and report to PR 1
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -115,33 +89,18 @@ jobs:
           - Source commit: \`${SOURCE_SHA}\`
           - Variant: release
           - Signing: 受入専用の一時テスト署名（本番配布用ではありません）
-          - Privacy gate: release Manifestに\`android.permission.INTERNET\`がないことをAction内で確認
+          - Privacy gate: release Manifestに\`android.permission.INTERNET\`がないことを確認
           - Validation: format / analyze / test / release build / APK署名検証
 
           同じパッケージを別の署名でインストール済みの場合は、既存アプリをアンインストールしてから導入してください。実タイムラインデータをGitHubへアップロードしないでください。
           EOF
-
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "$ASSET" "$CHECKSUM" --clobber --repo "$GITHUB_REPOSITORY"
-            gh release edit "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$RELEASE_TITLE" \
-              --notes-file "$notes" \
-              --prerelease
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "$RELEASE_TITLE" \
+              --notes-file "$notes" --prerelease
           else
-            gh release create "$RELEASE_TAG" "$ASSET" "$CHECKSUM" \
-              --repo "$GITHUB_REPOSITORY" \
-              --target "$SOURCE_SHA" \
-              --title "$RELEASE_TITLE" \
-              --notes-file "$notes" \
-              --prerelease
+            gh release create "$RELEASE_TAG" "$ASSET" "$CHECKSUM" --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" --title "$RELEASE_TITLE" --notes-file "$notes" --prerelease
           fi
-
-      - name: Record completion on PR 1
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          ASSET: ${{ steps.package.outputs.asset }}
-        run: |
           release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
           gh pr comment 1 --repo "$GITHUB_REPOSITORY" --body "受入用APKをGitHub prereleaseへ配置しました。\n\n- Release: ${release_url}\n- Asset: \`${ASSET}\`\n- Source: \`${SOURCE_SHA}\`\n- Validation: format / analyze / test / release build / Manifest privacy gate / APK署名検証 PASS\n- Signing: 受入専用の一時テスト署名（本番配布用ではありません）\n\n実データはGitHubへ添付せず、端末内からこのAPKへインポートしてください。"
