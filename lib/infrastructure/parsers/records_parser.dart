@@ -57,7 +57,7 @@ class RecordsTimelineParser implements TimelineParser {
       source,
       token,
       onSegment: (segment) {
-        count++;
+        if (_segmentToRecord(segment) != null) count++;
         final (start, end) = _segmentRange(segment);
         mergeRange(start, end);
       },
@@ -268,12 +268,42 @@ class RecordsTimelineParser implements TimelineParser {
     }
 
     // 旧形式の activitySegments はセグメント直下に
-    // activityType / distance を持つため、セグメント自身を activity として扱う。
+    // activityType / distance を含むため、セグメント自身を activity として扱う。
     final legacyType = segment['activityType'];
     if (legacyType is String || _number(segment['distance']) != null) {
       return _activityToRecord(segment, start, end, segment);
     }
+
+    // 実Android版エクスポートの timelinePath のみのセグメントは、経路点列を持つ
+    // 移動として扱う。点が 2 未満では距離を推定できないため破棄する。
+    final path = _timelinePathCoordinates(segment['timelinePath']);
+    if (path.length >= 2) {
+      return _timelinePathToMovement(start, end, path);
+    }
     return null;
+  }
+
+  NormalizedMovement _timelinePathToMovement(
+    DateTime start,
+    DateTime end,
+    List<LatLngE7> path,
+  ) {
+    return NormalizedMovement(
+      sourceKey: sourceKeyGenerator.fingerprint(
+        recordType: 'movement',
+        startAtUtc: start,
+        endAtUtc: end,
+        latE7: path.first.latE7,
+        lngE7: path.first.lngE7,
+      ),
+      startAtUtc: start,
+      endAtUtc: end,
+      distanceM: distanceService.pathMeters(path).round(),
+      distanceMethod: DistanceMethod.estimatedPath,
+      startLatLng: path.first,
+      endLatLng: path.last,
+      path: path,
+    );
   }
 
   (DateTime?, DateTime?) _segmentRange(Map<String, Object?> segment) {
@@ -371,6 +401,15 @@ class RecordsTimelineParser implements TimelineParser {
     var path = _waypoints(activity['waypoints']);
     if (path.isEmpty) path = _timelinePathCoordinates(segment['timelinePath']);
 
+    // 実 Android 版エクスポートは timelinePath を持たず、
+    // activity.start/end の latLng から始点・終点を取得する。
+    final startCoordinate = path.isNotEmpty
+        ? path.first
+        : _coordinateFrom(activity['start']);
+    final endCoordinate = path.isNotEmpty
+        ? path.last
+        : _coordinateFrom(activity['end']);
+
     final recordedDistance =
         _number(activity['distance']) ?? _number(activity['distanceMeters']);
     final int? distanceM;
@@ -381,14 +420,17 @@ class RecordsTimelineParser implements TimelineParser {
     } else if (path.length >= 2) {
       distanceM = distanceService.pathMeters(path).round();
       method = DistanceMethod.estimatedPath;
+    } else if (startCoordinate != null && endCoordinate != null) {
+      distanceM = distanceService
+          .haversineMeters(startCoordinate, endCoordinate)
+          .round();
+      method = DistanceMethod.estimatedDirect;
     } else {
       distanceM = null;
       method = DistanceMethod.unknown;
     }
 
     final normalizedActivity = activityType is String ? activityType : null;
-    final startCoordinate = path.isNotEmpty ? path.first : null;
-    final endCoordinate = path.isNotEmpty ? path.last : null;
     final key = sourceKeyGenerator.fingerprint(
       recordType: 'movement',
       startAtUtc: start,
@@ -431,27 +473,63 @@ class RecordsTimelineParser implements TimelineParser {
     return null;
   }
 
+  /// 座標候補を [LatLngE7] へ変換する。
+  ///
+  /// 対応形式:
+  /// - Map 内の `latLng`（度記号付き文字列など）
+  /// - Map 内の `point`（geo: 形式文字列）
+  /// - `latitudeE7` / `longitudeE7`
+  /// - `latE7` / `lngE7`
+  /// - `geo:lat,lng` 形式の文字列
+  /// - `lat,lng` 形式の文字列
+  /// - `lat\U+00B0, lng\U+00B0`（度記号付き）形式の文字列
+  ///
+  /// 不正な文字列は安全に null を返す。座標範囲外の値は
+  /// 上位の validator が破棄する（VAL-001）。
   LatLngE7? _coordinateFrom(Object? value) {
     if (value is Map<String, Object?>) {
+      final latLng = value['latLng'] ?? value['point'];
+      final fromLatLng = _coordinateFrom(latLng);
+      if (fromLatLng != null) return fromLatLng;
       final lat = _number(value['latitudeE7'] ?? value['latE7']);
       final lng = _number(value['longitudeE7'] ?? value['lngE7']);
       if (lat != null && lng != null) {
         return LatLngE7(lat.round(), lng.round());
       }
-      return _coordinateFrom(value['point']);
+      return null;
     }
     if (value is String) {
-      final normalized = value.startsWith('geo:') ? value.substring(4) : value;
-      final parts = normalized.split(',');
-      if (parts.length >= 2) {
-        final lat = double.tryParse(parts[0].trim());
-        final lng = double.tryParse(parts[1].split('?').first.trim());
+      var normalized = value.trim();
+      if (normalized.startsWith('geo:')) normalized = normalized.substring(4);
+      final rawParts = normalized.split(',');
+      if (rawParts.length >= 2) {
+        final lat = _coordinateDegree(rawParts.first.trim());
+        final lng = _coordinateDegree(rawParts[1].split('?').first.trim());
         if (lat != null && lng != null) {
+          if (!lat.isFinite ||
+              !lng.isFinite ||
+              lat > 5000 ||
+              lat < -5000 ||
+              lng > 5000 ||
+              lng < -5000) {
+            return null;
+          }
           return LatLngE7((lat * 1e7).round(), (lng * 1e7).round());
         }
       }
     }
     return null;
+  }
+
+  /// 度記号（`\U+00B0`）や改行・空白を除去した度座標値を返す。
+  double? _coordinateDegree(String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return null;
+    final degreeStripped = value
+        .replaceAll('\u00B0', '')
+        .replaceAll(RegExp(r'\s'), '');
+    if (degreeStripped.isEmpty) return null;
+    return double.tryParse(degreeStripped);
   }
 
   List<LatLngE7> _waypoints(Object? value) {
