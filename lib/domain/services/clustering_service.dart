@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import '../models/lat_lng.dart';
 
-/// クラスタリング結果の 1 地点。
 class Cluster {
   const Cluster({
     required this.centroidLatE7,
@@ -25,7 +24,6 @@ class Cluster {
   final String stableKey;
 }
 
-/// クラスタリングの入力（訪問 1 件）。
 class VisitSample {
   const VisitSample({
     required this.coord,
@@ -38,11 +36,7 @@ class VisitSample {
   final DateTime at;
 }
 
-/// 地点クラスタリング（設計書 6.1）。
-///
-/// MVP は決定的で軽量なグリッド方式を採用する。
-/// 訪問座標を約 150m 相当のセルへ割り当て、隣接セルの重み付き重心が
-/// 180m 以内なら Union-Find で統合する。重みは滞在秒数（上限付き）を使用。
+/// 訪問座標をグリッドへ割り当て、隣接セルの重心が近い場合に統合する。
 class ClusteringService {
   const ClusteringService({
     this.cellSizeM = 150.0,
@@ -50,202 +44,194 @@ class ClusteringService {
     this.maxDwellWeightSeconds = 12 * 60 * 60,
   });
 
-  /// グリッド 1 セルの一辺（メートル）。
   final double cellSizeM;
-
-  /// 隣接セルの重心を統合する距離閾値（メートル）。
   final double maxMergeDistanceM;
-
-  /// 重み付き重心の重み上限（滞在秒数）。
   final int maxDwellWeightSeconds;
 
-  /// WGS84 長半径（Web Mercator 変換用）。
   static const double wgs84SemiMajorAxis = 6378137.0;
+  static const double maxMercatorLatitude = 85.05112878;
 
-  /// 入力が空なら空リストを返す。
   List<Cluster> cluster(List<VisitSample> samples) {
     if (samples.isEmpty) return const [];
 
-    // 1. 座標を Web Mercator へ変換し、グリッドキーを算出する。
-    final cells = <String, _CellAgg>{};
-    for (final s in samples) {
-      final (x, y) = _toMercator(s.coord);
-      final key = _cellKey(x, y);
-      cells.putIfAbsent(key, () => _CellAgg()).add(s);
+    final cells = <(int, int), _CellAgg>{};
+    for (final sample in samples) {
+      final (x, y) = _toMercator(sample.coord);
+      final key = ((x / cellSizeM).floor(), (y / cellSizeM).floor());
+      cells.putIfAbsent(key, _CellAgg.new).add(sample);
     }
 
-    // 2. 隣接 8 セルを探索し、重心距離 180m 以内のグループを Union-Find で統合。
-    final uf = _UnionFind(cells.keys.toList());
-    for (final key in cells.keys) {
-      final agg = cells[key]!;
-      final (cx, cy) = agg.cell;
+    final unionFind = _UnionFind(cells.keys);
+    for (final entry in cells.entries) {
+      final key = entry.key;
+      final aggregate = entry.value;
       for (var dx = -1; dx <= 1; dx++) {
         for (var dy = -1; dy <= 1; dy++) {
           if (dx == 0 && dy == 0) continue;
-          final nk = _cellKey(cx + dx * cellSizeM, cy + dy * cellSizeM);
-          final nagg = cells[nk];
-          if (nagg == null) continue;
-          final dist = _metersBetween(agg.centroid, nagg.centroid);
-          if (dist <= maxMergeDistanceM) {
-            uf.union(key, nk);
+          final neighborKey = (key.$1 + dx, key.$2 + dy);
+          final neighbor = cells[neighborKey];
+          if (neighbor == null) continue;
+          if (_metersBetween(aggregate.centroid, neighbor.centroid) <=
+              maxMergeDistanceM) {
+            unionFind.union(key, neighborKey);
           }
         }
       }
     }
 
-    // 3. 統合後の重心・半径・集計値を計算する。
-    final groups = <String, List<_CellAgg>>{};
-    for (final key in cells.keys) {
-      groups.putIfAbsent(uf.find(key), () => []).add(cells[key]!);
+    final groups = <(int, int), List<_CellAgg>>{};
+    for (final entry in cells.entries) {
+      groups
+          .putIfAbsent(unionFind.find(entry.key), () => <_CellAgg>[])
+          .add(entry.value);
     }
 
-    final result = <Cluster>[];
-    for (final group in groups.values) {
-      result.add(_mergeGroup(group));
-    }
-    result.sort((a, b) => b.visitCount.compareTo(a.visitCount));
+    final result = groups.values.map(_mergeGroup).toList()
+      ..sort((a, b) {
+        final byVisits = b.visitCount.compareTo(a.visitCount);
+        if (byVisits != 0) return byVisits;
+        return a.stableKey.compareTo(b.stableKey);
+      });
     return result;
   }
 
   Cluster _mergeGroup(List<_CellAgg> group) {
     var totalWeight = 0.0;
-    var wLat = 0.0;
-    var wLng = 0.0;
+    var weightedLat = 0.0;
+    var weightedLng = 0.0;
     var visitCount = 0;
-    var dwell = 0;
+    var dwellSeconds = 0;
     var firstAt = group.first.firstAt;
     var lastAt = group.first.lastAt;
 
-    for (final agg in group) {
-      final weight =
-          math.min(agg.dwellSeconds, maxDwellWeightSeconds).toDouble().clamp(1.0, double.infinity);
+    for (final aggregate in group) {
+      final weight = math
+          .min(aggregate.dwellSeconds, maxDwellWeightSeconds)
+          .toDouble()
+          .clamp(1.0, double.infinity)
+          .toDouble();
       totalWeight += weight;
-      wLat += agg.centroid.lat * weight;
-      wLng += agg.centroid.lng * weight;
-      visitCount += agg.visitCount;
-      dwell += agg.dwellSeconds;
-      if (agg.firstAt.isBefore(firstAt)) firstAt = agg.firstAt;
-      if (agg.lastAt.isAfter(lastAt)) lastAt = agg.lastAt;
+      weightedLat += aggregate.centroid.lat * weight;
+      weightedLng += aggregate.centroid.lng * weight;
+      visitCount += aggregate.visitCount;
+      dwellSeconds += aggregate.dwellSeconds;
+      if (aggregate.firstAt.isBefore(firstAt)) firstAt = aggregate.firstAt;
+      if (aggregate.lastAt.isAfter(lastAt)) lastAt = aggregate.lastAt;
     }
 
-    final cLat = wLat / totalWeight;
-    final cLng = wLng / totalWeight;
-    final centroid = LatLngE7((cLat * 1e7).round(), (cLng * 1e7).round());
+    final centroid = LatLngE7(
+      (weightedLat / totalWeight * 1e7).round(),
+      (weightedLng / totalWeight * 1e7).round(),
+    );
 
-    var maxRadius = 0.0;
-    for (final agg in group) {
-      final d = _metersBetween(centroid, agg.centroid);
-      if (d > maxRadius) maxRadius = d;
+    var radiusM = 0.0;
+    for (final aggregate in group) {
+      radiusM = math.max(
+        radiusM,
+        _metersBetween(centroid, aggregate.centroid),
+      );
     }
-    // セル対角線の半分を半径に加算（セル内部の広がりを近似）。
-    maxRadius += (cellSizeM * math.sqrt2) / 2;
+    radiusM += (cellSizeM * math.sqrt2) / 2;
 
-    final rounded = centroid.roundForKey();
-    final stableKey = 'cluster|${rounded.latE7}|${rounded.lngE7}';
-
+    final roundedLat = centroid.latE7 ~/ 100;
+    final roundedLng = centroid.lngE7 ~/ 100;
     return Cluster(
       centroidLatE7: centroid.latE7,
       centroidLngE7: centroid.lngE7,
-      radiusM: maxRadius,
+      radiusM: radiusM,
       visitCount: visitCount,
-      dwellSeconds: dwell,
+      dwellSeconds: dwellSeconds,
       firstAt: firstAt,
       lastAt: lastAt,
-      stableKey: stableKey,
+      stableKey: 'cluster|$roundedLat|$roundedLng',
     );
   }
 
-  // --- Web Mercator ---
-
-  (double, double) _toMercator(LatLngE7 c) {
-    final latRad = c.lat * math.pi / 180;
-    final x = c.lng * wgs84SemiMajorAxis * math.pi / 180;
-    final y = wgs84SemiMajorAxis * math.log(math.tan(math.pi / 4 + latRad / 2));
+  (double, double) _toMercator(LatLngE7 coordinate) {
+    final latitude = coordinate.lat
+        .clamp(-maxMercatorLatitude, maxMercatorLatitude)
+        .toDouble();
+    final latitudeRadians = latitude * math.pi / 180;
+    final x = coordinate.lng * wgs84SemiMajorAxis * math.pi / 180;
+    final y = wgs84SemiMajorAxis *
+        math.log(math.tan(math.pi / 4 + latitudeRadians / 2));
     return (x, y);
   }
 
   double _metersBetween(LatLngE7 a, LatLngE7 b) {
-    final dLat = (b.lat - a.lat) * math.pi / 180;
-    final dLng = (b.lng - a.lng) * math.pi / 180;
+    final deltaLat = (b.lat - a.lat) * math.pi / 180;
+    final deltaLng = (b.lng - a.lng) * math.pi / 180;
     final lat1 = a.lat * math.pi / 180;
     final lat2 = b.lat * math.pi / 180;
-    final h = math.pow(math.sin(dLat / 2), 2) +
-        math.cos(lat1) * math.cos(lat2) * math.pow(math.sin(dLng / 2), 2);
-    return 2 * wgs84SemiMajorAxis * math.asin(math.sqrt(h.clamp(0.0, 1.0)));
-  }
-
-  String _cellKey(double x, double y) {
-    final cx = (x / cellSizeM).floor();
-    final cy = (y / cellSizeM).floor();
-    return '$cx,$cy';
+    final h = math.pow(math.sin(deltaLat / 2), 2) +
+        math.cos(lat1) *
+            math.cos(lat2) *
+            math.pow(math.sin(deltaLng / 2), 2);
+    return 2 *
+        wgs84SemiMajorAxis *
+        math.asin(math.sqrt(h.clamp(0.0, 1.0)));
   }
 }
 
-/// 1 グリッドセル分の集計。
 class _CellAgg {
-  _CellAgg();
-
-  (double, double) cell = (0, 0);
   int visitCount = 0;
   int dwellSeconds = 0;
-  var wLat = 0.0;
-  var wLng = 0.0;
+  double _latitudeSum = 0;
+  double _longitudeSum = 0;
   DateTime? _firstAt;
   DateTime? _lastAt;
 
   LatLngE7 get centroid => LatLngE7(
-        (wLat / visitCount * 1e7).round(),
-        (wLng / visitCount * 1e7).round(),
+        (_latitudeSum / visitCount * 1e7).round(),
+        (_longitudeSum / visitCount * 1e7).round(),
       );
 
   DateTime get firstAt => _firstAt!;
   DateTime get lastAt => _lastAt!;
 
-  void add(VisitSample s) {
+  void add(VisitSample sample) {
     visitCount++;
-    dwellSeconds += s.dwellSeconds;
-    wLat += s.coord.lat;
-    wLng += s.coord.lng;
-    _firstAt ??= s.at;
-    _lastAt ??= s.at;
-    if (s.at.isBefore(_firstAt!)) _firstAt = s.at;
-    if (s.at.isAfter(_lastAt!)) _lastAt = s.at;
+    dwellSeconds += sample.dwellSeconds;
+    _latitudeSum += sample.coord.lat;
+    _longitudeSum += sample.coord.lng;
+    _firstAt ??= sample.at;
+    _lastAt ??= sample.at;
+    if (sample.at.isBefore(_firstAt!)) _firstAt = sample.at;
+    if (sample.at.isAfter(_lastAt!)) _lastAt = sample.at;
   }
 }
 
-/// Union-Find（経路圧縮 + ランク）。
 class _UnionFind {
-  _UnionFind(List<String> keys) {
-    for (final k in keys) {
-      parent[k] = k;
-      rank[k] = 0;
+  _UnionFind(Iterable<(int, int)> keys) {
+    for (final key in keys) {
+      _parent[key] = key;
+      _rank[key] = 0;
     }
   }
 
-  final Map<String, String> parent = {};
-  final Map<String, int> rank = {};
+  final Map<(int, int), (int, int)> _parent = {};
+  final Map<(int, int), int> _rank = {};
 
-  String find(String x) {
-    final p = parent[x]!;
-    if (p != x) {
-      parent[x] = find(p);
-    }
-    return parent[x]!;
+  (int, int) find((int, int) key) {
+    final parent = _parent[key]!;
+    if (parent != key) _parent[key] = find(parent);
+    return _parent[key]!;
   }
 
-  void union(String a, String b) {
-    final ra = find(a);
-    final rb = find(b);
-    if (ra == rb) return;
-    final raRank = rank[ra]!;
-    final rbRank = rank[rb]!;
-    if (raRank < rbRank) {
-      parent[ra] = rb;
-    } else if (raRank > rbRank) {
-      parent[rb] = ra;
+  void union((int, int) a, (int, int) b) {
+    final rootA = find(a);
+    final rootB = find(b);
+    if (rootA == rootB) return;
+
+    final rankA = _rank[rootA]!;
+    final rankB = _rank[rootB]!;
+    if (rankA < rankB) {
+      _parent[rootA] = rootB;
+    } else if (rankA > rankB) {
+      _parent[rootB] = rootA;
     } else {
-      parent[rb] = ra;
-      rank[ra] = raRank + 1;
+      _parent[rootB] = rootA;
+      _rank[rootA] = rankA + 1;
     }
   }
 }
