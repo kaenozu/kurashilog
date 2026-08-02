@@ -39,8 +39,8 @@ class RecordsTimelineParser implements TimelineParser {
     final legacyPoints = <_LegacyPoint>[];
 
     void warn(String code, String message) {
-      warnings[code] = (warnings[code] ?? ImportWarning(code, message))
-          .mergedWith(ImportWarning(code, message));
+      final next = ImportWarning(code, message);
+      warnings[code] = warnings[code]?.mergedWith(next) ?? next;
     }
 
     void mergeRange(DateTime? start, DateTime? end) {
