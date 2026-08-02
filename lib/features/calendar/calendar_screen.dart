@@ -12,7 +12,6 @@ class CalendarScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(dashboardRefreshProvider);
     final month = ref.watch(selectedMonthProvider);
     final daily = ref.watch(_monthlyDaysProvider(month));
     final hasData = ref.watch(repositoryHasDataProvider);
@@ -37,7 +36,7 @@ class CalendarScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('読み込みに失敗しました: $e')),
         data: (days) {
-          if (!hasData) {
+          if (!(hasData.valueOrNull ?? false)) {
             return const EmptyState(
               icon: Icons.calendar_month,
               title: 'データがありません',
@@ -57,12 +56,13 @@ class CalendarScreen extends ConsumerWidget {
     final d = DateTime(y, m + delta, 1);
     ref.read(selectedMonthProvider.notifier).state =
         '${d.year.toString().padLeft(4, '0')}-'
-            '${d.month.toString().padLeft(2, '0')}';
+        '${d.month.toString().padLeft(2, '0')}';
   }
 }
 
 final _monthlyDaysProvider =
     FutureProvider.autoDispose.family<Map<String, bool>, String>((ref, month) async {
+  ref.watch(dashboardRefreshProvider);
   final repo = ref.watch(repositoryProvider);
   final parts = month.split('-');
   final y = int.parse(parts[0]);
@@ -75,10 +75,10 @@ final _monthlyDaysProvider =
   return {for (final r in rows) r.localDate: r.outingFlag};
 });
 
-final repositoryHasDataProvider =
-    FutureProvider.autoDispose<bool>((ref) async {
+final repositoryHasDataProvider = FutureProvider.autoDispose<bool>((ref) async {
+  ref.watch(dashboardRefreshProvider);
   final repo = ref.watch(repositoryProvider);
-  return await repo.countVisits() > 0;
+  return await repo.countVisits() > 0 || await repo.countMovements() > 0;
 });
 
 class _CalendarBody extends ConsumerWidget {
@@ -88,7 +88,6 @@ class _CalendarBody extends ConsumerWidget {
   final Map<String, bool> days;
 
   static const _weekLabels = ['月', '火', '水', '木', '金', '土', '日'];
-  static const _weekStartsMonday = true;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -96,11 +95,10 @@ class _CalendarBody extends ConsumerWidget {
     final parts = month.split('-');
     final y = int.parse(parts[0]);
     final m = int.parse(parts[1]);
-    final firstWeekday = DateTime(y, m, 1).weekday; // 1=Mon .. 7=Sun
+    final firstWeekday = DateTime(y, m, 1).weekday;
     final daysInMonth = DateTime(y, m + 1, 0).day;
     final today = DateTime.now();
-
-    final leadingBlanks = _weekStartsMonday ? firstWeekday - 1 : firstWeekday % 7;
+    final leadingBlanks = firstWeekday - 1;
 
     final cells = <Widget>[];
     for (final label in _weekLabels) {
@@ -136,9 +134,11 @@ class _CalendarBody extends ConsumerWidget {
       children: [
         Row(
           children: [
-            Text('$y年$m月',
-                style: theme.textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              '$y年$m月',
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
             const Spacer(),
             IconButton(
               tooltip: '月間ストーリー',
@@ -162,7 +162,6 @@ class _CalendarBody extends ConsumerWidget {
           children: cells,
         ),
         const SizedBox(height: 16),
-        // 凡例
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -230,7 +229,11 @@ class _DayCell extends StatelessWidget {
         child: Text(
           '$day',
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: !hasRecord ? scheme.onSurfaceVariant : scheme.onPrimary,
+                color: !hasRecord
+                    ? scheme.onSurfaceVariant
+                    : outing
+                        ? scheme.onPrimary
+                        : scheme.onPrimaryContainer,
                 fontWeight: isToday ? FontWeight.w800 : null,
               ),
         ),
