@@ -360,7 +360,7 @@ class ImportUseCase {
 
 class DigestSha256 {
   final _sink = _DigestSink();
-  late final ByteConversionSink _converter = sha256.startChunkedConversion(_sink);
+  late final _converter = sha256.startChunkedConversion(_sink);
   bool _closed = false;
 
   void add(List<int> bytes) {
