@@ -401,14 +401,16 @@ class RecordsTimelineParser implements TimelineParser {
     var path = _waypoints(activity['waypoints']);
     if (path.isEmpty) path = _timelinePathCoordinates(segment['timelinePath']);
 
-    // 実 Android 版エクスポートは timelinePath を持たず、
-    // activity.start/end の latLng から始点・終点を取得する。
-    final startCoordinate = path.isNotEmpty
-        ? path.first
-        : _coordinateFrom(activity['start']);
-    final endCoordinate = path.isNotEmpty
-        ? path.last
-        : _coordinateFrom(activity['end']);
+    // 実 Android 版エクスポートは activity.start/end の latLng を持つ。
+    // 単一点 path を理由に activity の異なる終点を捨てないため、
+    // activity の座標が存在する場合は path より優先する。
+    final activityStartCoordinate = _coordinateFrom(activity['start']);
+    final activityEndCoordinate = _coordinateFrom(activity['end']);
+
+    final startCoordinate =
+        activityStartCoordinate ?? (path.isNotEmpty ? path.first : null);
+    final endCoordinate =
+        activityEndCoordinate ?? (path.isNotEmpty ? path.last : null);
 
     final recordedDistance =
         _number(activity['distance']) ?? _number(activity['distanceMeters']);
@@ -484,8 +486,10 @@ class RecordsTimelineParser implements TimelineParser {
   /// - `lat,lng` 形式の文字列
   /// - `lat\U+00B0, lng\U+00B0`（度記号付き）形式の文字列
   ///
-  /// 不正な文字列は安全に null を返す。座標範囲外の値は
-  /// 上位の validator が破棄する（VAL-001）。
+  /// 不正な文字列、または度として解釈した座標が範囲外
+  /// （緯度 ±90 / 経度 ±180）の場合は安全に null を返す。
+  /// E7 整数の Map 形式は範囲検証なしで変換して返す
+  /// （後段の validator が VAL-001 として破棄する）。
   LatLngE7? _coordinateFrom(Object? value) {
     if (value is Map<String, Object?>) {
       final latLng = value['latLng'] ?? value['point'];
@@ -508,10 +512,10 @@ class RecordsTimelineParser implements TimelineParser {
         if (lat != null && lng != null) {
           if (!lat.isFinite ||
               !lng.isFinite ||
-              lat > 5000 ||
-              lat < -5000 ||
-              lng > 5000 ||
-              lng < -5000) {
+              lat < -90 ||
+              lat > 90 ||
+              lng < -180 ||
+              lng > 180) {
             return null;
           }
           return LatLngE7((lat * 1e7).round(), (lng * 1e7).round());
