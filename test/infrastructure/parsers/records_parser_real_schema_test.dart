@@ -72,6 +72,17 @@ void main() {
       expect(homeVisits[0].endAtUtc.isUtc, isTrue);
     });
 
+    test('preview count equals the number of parseable records', () async {
+      final preview = await parser.preview(
+        Stream.value(await File(fixturePath).readAsBytes()),
+        CancellationToken(),
+      );
+      final records = await parseFixture();
+
+      expect(preview.isOk, isTrue);
+      expect(preview.approxRecordCount, records.length);
+    });
+
     test('produces a stable and deterministic sourceKey set', () async {
       final bytes = await File(fixturePath).readAsBytes();
       final first = await parseBytes(bytes);
