@@ -11,14 +11,7 @@ import '../analysis/analysis_coordinator.dart';
 import '../models/persistence_models.dart';
 import '../repositories/kurashilog_repository.dart';
 
-/// インポート処理の進捗。
-enum ImportStage {
-  parsing,
-  validating,
-  clustering,
-  summarizing,
-  insights,
-}
+enum ImportStage { parsing, validating, clustering, summarizing, insights }
 
 class ImportProgress {
   const ImportProgress(this.stage, {this.percent = 0});
@@ -27,7 +20,6 @@ class ImportProgress {
   final int percent;
 }
 
-/// プレビュー結果（画面表示用）。
 class ImportPreview {
   const ImportPreview({
     required this.ok,
@@ -56,7 +48,6 @@ class ImportPreview {
   bool get isUnsupported => errorCode == 'IMP-002';
 }
 
-/// インポート結果（画面表示用）。
 class ImportResult {
   const ImportResult({
     required this.ok,
@@ -79,7 +70,6 @@ class ImportResult {
   final String? errorMessage;
 }
 
-/// タイムラインインポートのユースケース（設計書 5.1 処理シーケンス）。
 class ImportUseCase {
   const ImportUseCase({
     required this.repository,
@@ -97,75 +87,68 @@ class ImportUseCase {
   final RecordsTimelineParser parser;
   final RecordValidator validator;
 
-  /// プレビュー：形式・期間・概算件数を取得し、DB は変更しない。
   Future<ImportPreview> previewFile(
     String path, {
     CancellationToken? token,
   }) async {
-    final t = token ?? CancellationToken();
+    final cancellation = token ?? CancellationToken();
     final file = File(path);
     final int size;
     try {
       size = await file.length();
     } on FileSystemException {
-      return _error('IMP-001', 'ファイルを開けませんでした');
+      return _previewError('IMP-001', 'ファイルを開けませんでした');
     }
     if (size == 0) {
-      return _error('IMP-003', 'ファイルが空です');
+      return _previewError('IMP-003', 'ファイルが空です');
     }
 
-    // 1. スキーマ判定（先頭部分のみ）
     final detected = await schemaDetector.detect(file.openRead());
     if (detected == null) {
-      return _error('IMP-002', '未対応のファイル形式です');
+      return _previewError('IMP-002', '未対応のファイル形式です');
     }
 
-    // 2. 期間・概算件数（ハッシュも同時に計算）
     final hash = DigestSha256();
     final previewStream = file.openRead().map((chunk) {
       hash.add(chunk);
       return chunk;
     });
 
-    final PreviewResult preview;
     try {
-      preview = await parser.preview(previewStream, t);
-    } on ImportParseException catch (e) {
+      final preview = await parser.preview(previewStream, cancellation);
+      return ImportPreview(
+        ok: preview.isOk,
+        fileHash: hash.digest(),
+        schemaType: detected,
+        minAt: preview.minAt,
+        maxAt: preview.maxAt,
+        recordCount: preview.approxRecordCount,
+        warnings: preview.warnings,
+        errorCode: preview.errorCode,
+        errorMessage: preview.errorMessage,
+        fileSizeBytes: size,
+      );
+    } on ImportParseException catch (error) {
       return ImportPreview(
         ok: false,
         fileHash: hash.digest(),
         schemaType: detected,
-        errorCode: e.code,
-        errorMessage: e.message,
+        errorCode: error.code,
+        errorMessage: error.message,
         fileSizeBytes: size,
       );
+    } on FileSystemException {
+      return _previewError('IMP-001', 'ファイルを読み取れませんでした');
     }
-
-    return ImportPreview(
-      ok: preview.isOk,
-      fileHash: hash.digest(),
-      schemaType: detected,
-      minAt: preview.minAt,
-      maxAt: preview.maxAt,
-      recordCount: preview.approxRecordCount,
-      warnings: preview.warnings,
-      errorCode: preview.errorCode,
-      errorMessage: preview.errorMessage,
-      fileSizeBytes: size,
-    );
   }
 
-  /// 本取込：解析 → 検証 → 差分登録 → 分析再構築。
-  ///
-  /// 処理の途中で失敗しても既存データは変更されない（設計書 9.1）。
   Future<ImportResult> importFile(
     String path, {
     CancellationToken? token,
     void Function(ImportProgress progress)? onProgress,
   }) async {
-    final t = token ?? CancellationToken();
+    final cancellation = token ?? CancellationToken();
     final file = File(path);
-
     onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 5));
 
     final String fileHash;
@@ -173,17 +156,20 @@ class ImportUseCase {
       fileHash = await _hashFile(file);
     } on FileSystemException {
       return const ImportResult(
-          ok: false, errorCode: 'IMP-001', errorMessage: 'ファイルを開けませんでした');
+        ok: false,
+        errorCode: 'IMP-001',
+        errorMessage: 'ファイルを開けませんでした',
+      );
     }
 
-    final started = DateTime.now();
+    final startedAt = DateTime.now();
     final int importId;
     try {
       importId = await repository.insertImport(ImportedFileRecord(
         id: 0,
         fileHash: fileHash,
-        schemaType: 'timeline-records',
-        startedAt: started,
+        schemaType: parser.schemaType,
+        startedAt: startedAt,
         status: 'processing',
       ));
     } catch (_) {
@@ -194,112 +180,168 @@ class ImportUseCase {
       );
     }
 
-    onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 10));
-
     try {
-      // 解析（ストリーム）→ 検証（設計書 5.1 手順 4〜6）
-      final recordStream = parser.parse(file.openRead(), t);
-      final validated = await validator.validate(recordStream, t);
-
+      onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 10));
+      final records = parser.parse(file.openRead(), cancellation);
+      final validated = await validator.validate(records, cancellation);
       onProgress?.call(const ImportProgress(ImportStage.validating, percent: 40));
-      if (t.isCancelled) {
-        await _completeImport(importId, fileHash, started, 0, 0, null, null,
-            validated.warnings.length, 'cancelled');
+
+      if (cancellation.isCancelled) {
+        await _recordTerminalState(
+          importId: importId,
+          fileHash: fileHash,
+          startedAt: startedAt,
+          status: 'cancelled',
+          warningCount: validated.warnings.length,
+        );
         return const ImportResult(
-            ok: false, errorCode: 'IMP-005', errorMessage: 'キャンセルされました');
+          ok: false,
+          errorCode: 'IMP-005',
+          errorMessage: 'キャンセルされました',
+        );
       }
 
-      // 差分・重複排除（単一トランザクション）
-      onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 60));
-      final diff = await repository.insertNewRecords(
-        visits: validated.visits,
-        movements: validated.movements,
+      final sourceMinAt = _minStart(validated.visits, validated.movements);
+      final sourceMaxAt = _maxEnd(validated.visits, validated.movements);
+      late ImportDiffResult diff;
+
+      await repository.runInTransaction(() async {
+        onProgress?.call(
+          const ImportProgress(ImportStage.parsing, percent: 60),
+        );
+        diff = await repository.insertNewRecords(
+          visits: validated.visits,
+          movements: validated.movements,
+        );
+
+        if (cancellation.isCancelled) {
+          throw const ImportParseException('IMP-005', 'キャンセルされました');
+        }
+
+        onProgress?.call(
+          const ImportProgress(ImportStage.clustering, percent: 75),
+        );
+        await analysis.rebuildAll();
+
+        onProgress?.call(
+          const ImportProgress(ImportStage.insights, percent: 95),
+        );
+        await repository.updateImport(ImportedFileRecord(
+          id: importId,
+          fileHash: fileHash,
+          schemaType: parser.schemaType,
+          startedAt: startedAt,
+          completedAt: DateTime.now(),
+          sourceMinAt: sourceMinAt,
+          sourceMaxAt: sourceMaxAt,
+          status: 'completed',
+          warningCount: validated.warnings.length,
+          addedVisits: diff.addedVisits,
+          addedMovements: diff.addedMovements,
+        ));
+      });
+
+      onProgress?.call(
+        const ImportProgress(ImportStage.insights, percent: 100),
       );
-
-      // 分析再構築（クラスタ → サマリー → インサイト）
-      onProgress?.call(const ImportProgress(ImportStage.clustering, percent: 75));
-      await analysis.rebuildAll();
-
-      onProgress?.call(const ImportProgress(ImportStage.insights, percent: 95));
-
-      final minAt = _minStart(validated.visits);
-      final maxAt = _maxEnd(validated.visits);
-
-      await _completeImport(importId, fileHash, started, diff.addedVisits,
-          diff.addedMovements, minAt, maxAt, validated.warnings.length, 'completed');
-
-      onProgress?.call(const ImportProgress(ImportStage.insights, percent: 100));
-
       return ImportResult(
         ok: true,
         addedVisits: diff.addedVisits,
         addedMovements: diff.addedMovements,
-        sourceMinAt: minAt,
-        sourceMaxAt: maxAt,
+        sourceMinAt: sourceMinAt,
+        sourceMaxAt: sourceMaxAt,
         warnings: validated.warnings,
       );
-    } on ImportParseException catch (e) {
-      await _completeImport(importId, fileHash, started, 0, 0, null, null, 0,
-          'failed', errorCode: e.code);
-      return ImportResult(ok: false, errorCode: e.code, errorMessage: e.message);
-    } catch (e) {
-      await _completeImport(importId, fileHash, started, 0, 0, null, null, 0,
-          'failed', errorCode: 'IMP-004');
+    } on ImportParseException catch (error) {
+      await _recordTerminalState(
+        importId: importId,
+        fileHash: fileHash,
+        startedAt: startedAt,
+        status: error.code == 'IMP-005' ? 'cancelled' : 'failed',
+      );
       return ImportResult(
-          ok: false, errorCode: 'IMP-004', errorMessage: e.toString());
+        ok: false,
+        errorCode: error.code,
+        errorMessage: error.message,
+      );
+    } on FileSystemException {
+      await _recordTerminalState(
+        importId: importId,
+        fileHash: fileHash,
+        startedAt: startedAt,
+        status: 'failed',
+      );
+      return const ImportResult(
+        ok: false,
+        errorCode: 'IMP-001',
+        errorMessage: 'ファイルを読み取れませんでした',
+      );
+    } catch (_) {
+      await _recordTerminalState(
+        importId: importId,
+        fileHash: fileHash,
+        startedAt: startedAt,
+        status: 'failed',
+      );
+      return const ImportResult(
+        ok: false,
+        errorCode: 'IMP-004',
+        errorMessage: 'データベースの更新に失敗しました',
+      );
     }
   }
 
-  Future<void> _completeImport(
-    int id,
-    String fileHash,
-    DateTime started,
-    int addedVisits,
-    int addedMovements,
-    DateTime? minAt,
-    DateTime? maxAt,
-    int warningCount,
-    String status, {
-    String? errorCode,
+  Future<void> _recordTerminalState({
+    required int importId,
+    required String fileHash,
+    required DateTime startedAt,
+    required String status,
+    int warningCount = 0,
   }) async {
     try {
       await repository.updateImport(ImportedFileRecord(
-        id: id,
+        id: importId,
         fileHash: fileHash,
-        schemaType: 'timeline-records',
-        startedAt: started,
+        schemaType: parser.schemaType,
+        startedAt: startedAt,
         completedAt: DateTime.now(),
-        sourceMinAt: minAt,
-        sourceMaxAt: maxAt,
         status: status,
         warningCount: warningCount,
-        addedVisits: addedVisits,
-        addedMovements: addedMovements,
       ));
     } catch (_) {
-      // 状態更新の失敗は致命的ではない
+      // 元の失敗理由を優先する。processing 行は次回起動時の復旧対象にできる。
     }
   }
 
-  DateTime? _minStart(List<StoredVisit> visits) {
-    if (visits.isEmpty) return null;
-    var m = visits.first.startAtUtc;
-    for (final v in visits) {
-      if (v.startAtUtc.isBefore(m)) m = v.startAtUtc;
+  DateTime? _minStart(
+    List<StoredVisit> visits,
+    List<StoredMovement> movements,
+  ) {
+    DateTime? minimum;
+    for (final value in <DateTime>[
+      ...visits.map((visit) => visit.startAtUtc),
+      ...movements.map((movement) => movement.startAtUtc),
+    ]) {
+      if (minimum == null || value.isBefore(minimum)) minimum = value;
     }
-    return m;
+    return minimum;
   }
 
-  DateTime? _maxEnd(List<StoredVisit> visits) {
-    if (visits.isEmpty) return null;
-    var m = visits.first.endAtUtc;
-    for (final v in visits) {
-      if (v.endAtUtc.isAfter(m)) m = v.endAtUtc;
+  DateTime? _maxEnd(
+    List<StoredVisit> visits,
+    List<StoredMovement> movements,
+  ) {
+    DateTime? maximum;
+    for (final value in <DateTime>[
+      ...visits.map((visit) => visit.endAtUtc),
+      ...movements.map((movement) => movement.endAtUtc),
+    ]) {
+      if (maximum == null || value.isAfter(maximum)) maximum = value;
     }
-    return m;
+    return maximum;
   }
 
-  ImportPreview _error(String code, String message) => ImportPreview(
+  ImportPreview _previewError(String code, String message) => ImportPreview(
         ok: false,
         fileHash: '',
         schemaType: 'unknown',
@@ -316,15 +358,21 @@ class ImportUseCase {
   }
 }
 
-/// SHA-256 の逐次計算ヘルパー（ストリームに挟んで全体ハッシュを取る）。
 class DigestSha256 {
   final _sink = _DigestSink();
-  late final _converter = sha256.startChunkedConversion(_sink);
+  late final ByteConversionSink _converter = sha256.startChunkedConversion(_sink);
+  bool _closed = false;
 
-  void add(List<int> bytes) => _converter.add(bytes);
+  void add(List<int> bytes) {
+    if (_closed) throw StateError('Digest already finalized');
+    _converter.add(bytes);
+  }
 
   String digest() {
-    _converter.close();
+    if (!_closed) {
+      _converter.close();
+      _closed = true;
+    }
     return _sink.digest?.toString() ?? '';
   }
 }
