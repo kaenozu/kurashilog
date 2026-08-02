@@ -50,63 +50,67 @@ void main() {
       expect(timelineMovement.startLatLng!.lngE7, 1397583398);
     });
 
-    test('activity records keep start/end coordinate and recorded distance',
-        () async {
-      final records = await parser
-          .parse(
-            Stream.value(await File(fixturePath).readAsBytes()),
-            CancellationToken(),
-          )
-          .toList();
+    test(
+      'activity records keep start/end coordinate and recorded distance',
+      () async {
+        final records = await parser
+            .parse(
+              Stream.value(await File(fixturePath).readAsBytes()),
+              CancellationToken(),
+            )
+            .toList();
 
-      final vehicle = records
-          .whereType<NormalizedMovement>()
-          .singleWhere((m) => m.activityType == 'IN_VEHICLE');
+        final vehicle = records.whereType<NormalizedMovement>().singleWhere(
+          (m) => m.activityType == 'IN_VEHICLE',
+        );
 
-      expect(vehicle.distanceMethod, DistanceMethod.recorded);
-      expect(vehicle.distanceM, 24507);
-      expect(vehicle.startLatLng!.latE7, 356663790);
-      expect(vehicle.startLatLng!.lngE7, 1397583398);
-      expect(vehicle.startLatLng!.latE7, isNot(vehicle.endLatLng!.latE7));
-    });
+        expect(vehicle.distanceMethod, DistanceMethod.recorded);
+        expect(vehicle.distanceM, 24507);
+        expect(vehicle.startLatLng!.latE7, 356663790);
+        expect(vehicle.startLatLng!.lngE7, 1397583398);
+        expect(vehicle.startLatLng!.latE7, isNot(vehicle.endLatLng!.latE7));
+      },
+    );
 
-    test('activity without distanceMeters falls back to direct estimation',
-        () async {
-      final records = await parser
-          .parse(
-            Stream.value(await File(fixturePath).readAsBytes()),
-            CancellationToken(),
-          )
-          .toList();
+    test(
+      'activity without distanceMeters falls back to direct estimation',
+      () async {
+        final records = await parser
+            .parse(
+              Stream.value(await File(fixturePath).readAsBytes()),
+              CancellationToken(),
+            )
+            .toList();
 
-      final unknownActivity = records
-          .whereType<NormalizedMovement>()
-          .singleWhere(
-            (m) => m.activityType == 'UNKNOWN_ACTIVITY_TYPE',
-          );
+        final unknownActivity = records
+            .whereType<NormalizedMovement>()
+            .singleWhere((m) => m.activityType == 'UNKNOWN_ACTIVITY_TYPE');
 
-      expect(unknownActivity.distanceMethod, DistanceMethod.estimatedDirect);
-      expect(unknownActivity.distanceM, greaterThan(0));
-      expect(unknownActivity.startLatLng, isNotNull);
-      expect(unknownActivity.endLatLng, isNotNull);
-    });
+        expect(unknownActivity.distanceMethod, DistanceMethod.estimatedDirect);
+        expect(unknownActivity.distanceM, greaterThan(0));
+        expect(unknownActivity.startLatLng, isNotNull);
+        expect(unknownActivity.endLatLng, isNotNull);
+      },
+    );
 
-    test('visit placeLocation with degree latLng produces valid coordinates',
-        () async {
-      final records = await parser
-          .parse(
-            Stream.value(await File(fixturePath).readAsBytes()),
-            CancellationToken(),
-          )
-          .toList();
+    test(
+      'visit placeLocation with degree latLng produces valid coordinates',
+      () async {
+        final records = await parser
+            .parse(
+              Stream.value(await File(fixturePath).readAsBytes()),
+              CancellationToken(),
+            )
+            .toList();
 
-      final parkVisit = records.whereType<NormalizedVisit>().singleWhere(
-        (v) => v.latLng.latE7 == 356663790 && v.latLng.lngE7 == 1397583398,
-      );
+        final parkVisit = records.whereType<NormalizedVisit>().singleWhere(
+          (v) => v.latLng.latE7 == 356663790 && v.latLng.lngE7 == 1397583398,
+        );
 
-      expect(parkVisit.latLng.isValid, isTrue);
-      expect(parkVisit.latLng.latE7, 356663790);
-      expect(parkVisit.latLng.lngE7, 1397583398);
-    });
+        expect(parkVisit.latLng.isValid, isTrue);
+        expect(parkVisit.latLng.latE7, 356663790);
+        expect(parkVisit.latLng.lngE7, 1397583398);
+      },
+    );
   });
 }
