@@ -1,0 +1,408 @@
+くらしログ
+（仮称）
+MVP 基本設計・詳細設計書
+アーキテクチャ、データモデル、アルゴリズム、テスト設計
+ユーザー自身が書き出した位置履歴を端末内で分析し、
+生活の変化を見つける無料アプリ
+文書管理
+目次
+1  設計概要
+2  アーキテクチャ
+3  モジュール設計
+4  データモデル
+5  インポート設計
+6  分析エンジン設計
+7  UI・状態管理設計
+8  セキュリティ・プライバシー設計
+9  エラー・回復設計
+10  性能・容量設計
+11  テスト設計
+12  ビルド・リリース設計
+13  実装計画
+14  技術リスク・ADR
+1. 設計概要
+1.1 システム構成
+単一端末上で完結するモバイルアプリとする。ユーザーが選択したJSONを読み込み、共通の正規化モデルへ変換し、SQLiteへ保存する。集計・インサイト生成も端末内で実行する。MVPでは独自バックエンド、認証、ネットワーク通信、バックグラウンド位置取得を持たない。
+図1　論理アーキテクチャ
+2. アーキテクチャ
+2.1 レイヤー責務
+2.2 依存ルール
+Domain層はFlutter、Drift、Android API、JSONライブラリへ直接依存しない。
+パーサーは正規化DTOを返し、画面・DBモデルを直接生成しない。
+DBの内部IDを画面URLや共有データの恒久IDとして使用しない。
+画面はRepositoryへ直接アクセスせず、ユースケースまたはController経由で操作する。
+分析ルールは純粋関数を優先し、固定フィクスチャで再現可能にする。
+2.3 ディレクトリ案
+3. モジュール設計
+3.1 主要ユースケース
+4. データモデル
+4.1 エンティティ
+4.2 値の保存形式
+4.3 インデックス
+visits(sourceKey) UNIQUE：重複排除。
+visits(startAtUtc), visits(clusterId, startAtUtc)：期間・地点別検索。
+movements(sourceKey) UNIQUE、movements(startAtUtc)。
+place_clusters(stableKey) UNIQUE、place_clusters(lastAt)。
+daily_summaries(localDate) PRIMARY KEY、monthly_summaries(yearMonth) PRIMARY KEY。
+insights(periodKey, ruleId) UNIQUE：同一期間の重複生成を防止。
+5. インポート設計
+図2　インポート処理データフロー
+5.1 処理シーケンス
+1. Content URIを受け取り、MIME、拡張子、サイズ、読み取り可否を確認する。
+2. 先頭部分とトップレベルキーを読み、SchemaDetectorが対応パーサーを選択する。
+3. プレビューでは期間と概算レコード数だけ取得し、DBを変更しない。
+4. 本取込はIsolateでストリーム解析し、NormalizedVisit/Movementを小分けに送る。
+5. Validatorが時刻、座標範囲、期間順序、異常距離、必須値を検査する。
+6. sourceKeyで既存データを照合し、新規・変更候補を作業テーブルへ登録する。
+7. 全解析成功後、単一トランザクションで本テーブルへ反映する。
+8. クラスタ、日次、月次、インサイトを影響期間だけ再計算する。
+9. importレコードをcompletedへ更新し、結果を画面へ返す。
+5.2 パーサーインターフェース
+5.3 sourceKey生成
+ソース側に安定IDがある場合は、そのIDとスキーマ種別をハッシュ化する。安定IDがない場合は、レコード種別、開始・終了時刻、丸めた座標、主要属性からSHA-256相当の指紋を生成する。ファイル全体のハッシュだけでは差分ファイルを扱えないため、レコード単位のキーを必須とする。
+5.4 検証規則
+6. 分析エンジン設計
+6.1 地点クラスタリング
+MVPは決定的で軽量なグリッド方式を採用する。訪問座標を約150m相当のセルへ割り当て、隣接セルの重み付き重心が180m以内なら統合する。重みは滞在秒数を上限付きで使用する。道路を挟む隣接施設の誤統合を完全には防げないため、ユーザーが分割する機能はMVP外、ラベル・除外で補正する。
+1. 座標をWeb Mercatorへ変換し、150mグリッドキーを算出する。
+2. グリッドごとに訪問回数、総滞在、重み付き重心を集計する。
+3. 隣接8セルを探索し、重心距離180m以内のグループをUnion-Findで統合する。
+4. 統合後の重心、半径、初回・最終訪問、stableKeyを計算する。
+5. 前回クラスタとの重心距離・主要メンバー一致で同一性を維持する。
+6.2 距離算出
+異常速度の既定閾値は実装定数として一箇所に置き、テストデータで調整する。飛行機移動を誤って除外しないよう、距離自体を消すのではなく「日常移動集計から除外」「総移動には含める」など用途別のフラグを保持する。
+6.3 日次・月次集計
+6.4 インサイト選定
+各ルールはeligible、score、messageDataを返す純粋関数とする。
+サンプル不足、品質低下、除外地点の影響を事前条件で判定する。
+同じ意味のルールはグループ化し、scoreが高い1件だけ表示する。
+ホームは最大3件、月間ストーリーは最大8件を表示する。
+severityは情報・注目の2段階。警告色を常用しない。
+文言はテンプレート化し、原因や健康状態を断定しない。
+6.5 鮮度アルゴリズム
+7. UI・状態管理設計
+7.1 ナビゲーション
+7.2 画面状態
+7.3 デザインシステム
+7.4 ホーム表示モデル
+8. セキュリティ・プライバシー設計
+8.1 Android設定
+9. エラー・回復設計
+9.1 トランザクション境界
+解析結果は一定件数ごとにメモリから作業テーブルへ書き出してよいが、本テーブルへの反映は解析完了後に行う。作業テーブルにはimportIdを付与し、起動時にstatus=processingの古い取込があれば安全に削除する。既存データと作業データの統合、クラスタ更新、サマリー無効化を一つのDBトランザクションで行う。
+10. 性能・容量設計
+10.1 キャッシュ戦略
+日次・月次サマリーをDBへ保存し、画面表示のたびに全履歴を再集計しない。
+インポートで影響した最小日〜最大日だけ日次サマリーを無効化する。
+クラスタ変更時は、そのクラスタを参照する日次・月次・インサイトを再計算する。
+メモリキャッシュは画面単位で破棄可能とし、位置履歴の二重保持を避ける。
+11. テスト設計
+11.1 必須フィクスチャ
+最小：訪問1件・移動0件。
+標準：30日、平日・休日、複数地点、経路あり／なし。
+長期：1年以上、数千訪問、重複レコードあり。
+異常：破損JSON、座標欠損、逆転期間、極端な速度、巨大文字列。
+差分：同じ期間の一部追加、完全同一、過去期間への訂正。
+タイムゾーン：日本、DSTあり地域、日付境界を跨ぐ区間。
+11.2 品質ゲート
+12. ビルド・リリース設計
+dev / releaseの2構成。devのみ匿名fixtureの読込メニューを持てる。
+本番ビルドでは詳細ログ、サンプル位置、デバッグDB閲覧機能を除外する。
+DB schemaVersionを明示し、各マイグレーションの前後テストを追加する。
+署名鍵・ストア認証情報はリポジトリへ保存しない。
+クラッシュSDKを使わないため、ユーザーが任意でコピーできる非個人診断情報を用意する。
+初期公開は内部配布またはクローズドテストで、実データ形式とUXを検証する。
+12.1 リリース前プライバシーチェック
+1. ネットワーク権限・通信依存がない。
+2. DB・キャッシュ・ログ・バックアップに元JSON全文が残らない。
+3. 全削除が実機で完了する。
+4. プライバシーポリシーとアプリ内説明が実装と一致する。
+5. Google公式と誤認させる名称・ロゴ・画面表現がない。
+13. 実装計画
+13.1 実装順の理由
+最初に実データスキーマとパーサーを確定する。UIから先に作ると、取得できる情報量や精度に依存した作り直しが発生するためである。次にデータモデルと分析を固定し、最後に見た目を完成させる。ただしThemeと主要カードのデザイン試作はP1で行い、「無料アプリらしい粗さ」が残らないことを早期確認する。
+14. 技術リスク・ADR
+14.1 主な残存リスク
+--- TABLE ---
+文書バージョン | 0.1
+作成日 | 2026年8月2日
+対象 | Android先行 MVP
+ステータス | 実装着手用ドラフト
+--- TABLE ---
+版 | 日付 | 変更内容 | 状態
+0.1 | 2026-08-02 | MVP初版。会話で合意した制約・機能・品質基準を反映。 | Draft
+--- TABLE ---
+設計判断
+Android先行のFlutterアプリとして設計する。ネットワーク権限を持たず、ファイル解析はIsolate、永続化はDrift/SQLite、状態管理はRiverpod相当の単方向データフローを採用する。ライブラリの具体的バージョンは実装開始時に固定する。
+--- TABLE ---
+領域 | 採用方針 | 理由
+UI | Flutter / Material系コンポーネント | 短期間で一貫した見た目を作り、将来iOSへ展開可能。
+状態管理 | 単方向データフロー（Riverpod相当） | 非同期取込・画面状態・テストを分離しやすい。
+DB | Drift + SQLite | 型安全なクエリ、トランザクション、マイグレーションが扱いやすい。
+JSON解析 | ストリーム読込 + Isolate | 巨大ファイルでUI停止とメモリ急増を防ぐ。
+地図連携 | Android geo: Intent | 有料APIとアプリ内地図を避ける。
+通信 | なし（INTERNET権限なし） | 無料運用とプライバシー保証を両立する。
+--- TABLE ---
+レイヤー | 主な責務 | 依存方向
+Presentation | 画面、ナビゲーション、表示モデル、ユーザー操作、アクセシビリティ。 | Applicationのみ参照。
+Application | ユースケース、トランザクション境界、進捗、キャンセル、結果整形。 | Domainと抽象Repositoryを参照。
+Domain | 正規化モデル、値オブジェクト、集計、鮮度、クラスタ、インサイト規則。 | FlutterやDBへ依存しない。
+Infrastructure | JSON、Content URI、SQLite、共有受信、外部地図Intent。 | Domain/Applicationのインターフェースを実装。
+--- TABLE ---
+lib/
+  app/                 # 起動、ルーティング、テーマ、DI
+  features/
+    onboarding/
+    import_timeline/
+    dashboard/
+    calendar/
+    day_detail/
+    places/
+    settings/
+  application/         # UseCase / Controller / State
+  domain/
+    models/
+    services/
+    repositories/
+    rules/
+  infrastructure/
+    database/
+    parsers/
+    file_access/
+    platform/
+  shared/              # widgets, formatters, error types
+
+test/
+  fixtures/
+  unit/
+  database/
+  widget/
+  integration/
+--- TABLE ---
+ID | モジュール | 責務
+M01 | TimelineImport | ファイル受信、形式判定、解析、検証、差分登録、進捗・キャンセル。
+M02 | TimelineDomain | NormalizedVisit/Movement、日時・座標値、品質、集計規則。
+M03 | PlaceClustering | 近接地点のクラスタ化、ラベル・除外、安定キー生成。
+M04 | SummaryEngine | 日次・月次集計、比較期間、キャッシュ更新。
+M05 | InsightEngine | 条件判定、重要度、重複抑制、表示文生成。
+M06 | Freshness | 最新日時、欠落日数、欠落率、品質ランク。
+M07 | LocalDatabase | テーブル、DAO、トランザクション、マイグレーション。
+M08 | Presentation | 画面、状態、ナビゲーション、デザインシステム。
+M09 | PrivacyControl | 全削除、ログ抑制、バックアップ除外、プライバシー表示。
+M10 | PlatformBridge | ファイル共有受信、geo: Intent、端末情報。
+--- TABLE ---
+UseCase | 入力 | 出力／副作用
+PreviewTimelineFile | Content URI | 形式、期間、ファイルサイズ、警告。DB変更なし。
+ImportTimeline | URI、キャンセルToken | 新規件数、対象期間、警告。成功時のみDB確定。
+RebuildSummaries | 対象期間 | 日次・月次サマリーとインサイトを更新。
+GetDashboard | 対象月 | 品質、指標、比較、インサイト、カレンダー概要。
+UpdatePlaceLabel | clusterId、名称、カテゴリ | 地点ラベルを保存し、関連集計を再計算。
+DeleteAllUserData | 確認済みフラグ | DB・キャッシュ・ユーザー設定を削除。
+OpenExternalMap | 座標、任意ラベル | geo: URIを生成して外部アプリへ委譲。
+--- TABLE ---
+テーブル | 目的 | 主要列
+timeline_imports | 取込単位 | id, fileHash, schemaType, startedAt, completedAt, sourceMinAt, sourceMaxAt, status, warningCount
+visits | 訪問区間 | id, sourceKey, startAtUtc, endAtUtc, latE7, lngE7, accuracyM, sourceLabel, clusterId, confidence
+movements | 移動区間 | id, sourceKey, startAtUtc, endAtUtc, startVisitId, endVisitId, distanceM, distanceMethod, activityType, confidence
+place_clusters | 頻出地点 | id, stableKey, centroidLatE7, centroidLngE7, radiusM, visitCount, dwellSeconds, firstAt, lastAt, labelId, excluded
+place_labels | ユーザーラベル | id, displayName, category, isBasePlace, createdAt, updatedAt
+daily_summaries | 日次集計 | localDate, outingFlag, visitCount, clusterCount, distanceM, distanceMethod, firstAt, lastAt, quality
+monthly_summaries | 月次集計 | yearMonth, outingDays, distanceM, uniqueClusters, newClusters, maxDistanceDate, calculatedAt
+insights | 表示用インサイト | id, periodKey, ruleId, severity, title, body, metricJson, createdAt, dismissed
+app_settings | 設定 | key, value, updatedAt
+--- TABLE ---
+値 | 保存形式 | 理由
+日時 | UTCの整数ミリ秒。表示時に端末タイムゾーンへ変換。 | 並び替えとDST処理を安定させる。
+ローカル日付 | YYYY-MM-DD文字列または整数日キー。 | 日次集計の検索を単純化。
+座標 | 緯度・経度×10^7の整数。 | 浮動小数の比較差を減らす。
+距離 | メートル整数。 | 単位変換と集計を統一。
+期間 | 開始含む・終了含まない [start, end)。 | 重複・境界判定を統一。
+品質 | enum整数 + 補足フラグ。 | UI表示と将来の閾値変更を分離。
+--- TABLE ---
+abstract interface class TimelineParser {
+  String get schemaType;
+  Future<PreviewResult> preview(Stream<List<int>> source);
+  Stream<NormalizedRecord> parse(
+    Stream<List<int>> source,
+    CancellationToken token,
+  );
+}
+
+sealed class NormalizedRecord {}
+final class NormalizedVisit extends NormalizedRecord { ... }
+final class NormalizedMovement extends NormalizedRecord { ... }
+--- TABLE ---
+sourceKey = hash(
+  schemaType |
+  recordType |
+  startAtUtc |
+  endAtUtc |
+  round(lat, 5) |
+  round(lng, 5) |
+  normalizedActivity
+)
+--- TABLE ---
+検証 | 扱い
+座標が範囲外 | レコードを破棄しwarning。
+開始>終了 | 補正せず破棄。
+開始=終了 | 訪問は破棄、移動は距離0なら破棄。
+速度が非現実的 | レコードは保持可能だが距離集計から除外しquality低下。
+必須トップレベルキーなし | ファイル全体をunsupportedで終了。
+未知フィールド | 無視し、パーサーバージョンと警告件数を記録。
+途中キャンセル | 作業データを破棄し、既存データを維持。
+--- TABLE ---
+優先度 | 方法 | 品質
+1 | ソースに区間距離があり、値が妥当なら使用。 | recorded
+2 | 経路点列がある場合、隣接点のHaversine距離を合算。 | estimated_path
+3 | 開始・終了座標のHaversine直線距離。 | estimated_direct
+4 | 座標不足または異常値。 | unknown
+--- TABLE ---
+DailySummary(date):
+  visits       = visits overlapping local day
+  movements    = movements overlapping local day
+  outingFlag   = has non-excluded visit or valid movement
+  distanceM    = sum(valid movement distance)
+  uniquePlaces = distinct non-excluded clusterId
+  firstAt      = minimum activity time
+  lastAt       = maximum activity time
+
+MonthlySummary(month):
+  aggregate DailySummary
+  compare with previous equal-length period
+--- TABLE ---
+FreshnessInput {
+  nowLocalDate
+  latestImportedAt
+  analysisWindowDays
+}
+
+staleDays   = daysBetween(latestImportedAt.localDate, nowLocalDate)
+missingRate = min(staleDays, analysisWindowDays) / analysisWindowDays
+baseRank    = rankByStaleDays(staleDays)
+finalRank   = missingRate >= 0.20 ? downgrade(baseRank) : baseRank
+--- TABLE ---
+AppRoot
+ ├─ OnboardingFlow        # 未完了時のみ
+ └─ MainShell
+     ├─ Home
+     ├─ Calendar
+     ├─ Places
+     └─ Settings
+
+Modal / child routes:
+  ImportPreview -> ImportProgress -> ImportResult
+  MonthStory
+  DayDetail
+  PlaceEdit
+  DeleteConfirmation
+--- TABLE ---
+状態 | 表現
+initial | スケルトンまたは空状態。
+loading | 操作を妨げない局所ローディング。インポートは専用進捗画面。
+data | 表示モデルを描画。品質バッジを常に付与。
+empty | 理由と次の行動を1つ提示。
+errorRecoverable | 原因、再試行、ファイル選び直し。
+errorFatal | エラーコード、診断情報、既存データが安全であることを表示。
+--- TABLE ---
+要素 | 仕様
+色 | 背景は暖色寄りニュートラル、アクセントは深緑。品質状態は色＋文言＋アイコン。
+文字 | 端末標準の日本語サンセリフ。見出し、主要値、補助文の3階層。
+カード | 角丸12〜16dp、強い影を避け、背景差と余白で階層化。
+グラフ | 大規模チャートより、カード内バー、カレンダー濃淡、相対変化を優先。
+アニメーション | 200〜300msの控えめな遷移。インポート中は進捗と処理段階を表示。
+ダークモード | MVPで対応。色を直接指定せずTheme Extensionで管理。
+--- TABLE ---
+DashboardViewModel {
+  FreshnessBadge freshness
+  YearMonth selectedMonth
+  List<MetricCardVM> metrics       // 最大4
+  List<InsightCardVM> insights     // 最大3
+  CalendarHeatmapVM heatmap
+  ImportPromptVM? importPrompt
+}
+--- TABLE ---
+対策 | 設計
+通信遮断 | AndroidManifestにINTERNET権限を宣言しない。依存SDKにも通信系を含めない。
+ファイルアクセス | SAFのContent URIを読み取り専用で開き、不要な永続権限を保持しない。
+元データ | 一時ストリームとして処理し、アプリ領域へコピーしない。
+DB保護 | アプリサンドボックスへ保存。OSバックアップから除外。
+ログ | 本番は構造化エラーコードのみ。座標、時刻、ラベル、パスを出力しない。
+画面共有 | 位置詳細の共有機能をMVPに含めない。スクリーンショット禁止は行わない。
+削除 | DB close→ファイル削除→キャッシュ削除→設定初期化を順に実行。
+依存管理 | 不要な解析・広告・クラッシュSDKを入れない。SBOM相当の依存一覧を保持。
+--- TABLE ---
+<uses-permission android:name="android.permission.INTERNET" />
+# 上記は宣言しない
+
+android:allowBackup="false"
+# または dataExtractionRules でDB・位置設定を除外
+
+Intent filters:
+  ACTION_SEND / ACTION_VIEW
+  MIME: application/json, application/octet-stream (検証必須)
+--- TABLE ---
+実装レビュー項目
+リリースAPK/AABの最終Manifestを解析し、依存ライブラリがINTERNET権限を追加していないことを確認する。
+--- TABLE ---
+コード | 事象 | 原因例 | 回復
+IMP-001 | ファイルを開けない | 権限失効・移動 | 再選択を案内。既存データ変更なし。
+IMP-002 | 未対応形式 | SchemaDetector不一致 | 対応形式の説明。診断コードのみ表示。
+IMP-003 | 破損JSON | 構文エラー | 行・位置は内部診断のみ。再エクスポートを案内。
+IMP-004 | 容量不足 | DB書込失敗 | トランザクション破棄。必要容量の目安を表示。
+IMP-005 | キャンセル | ユーザー操作 | 作業データ破棄。再実行可能。
+DB-001 | DBマイグレーション失敗 | アプリ更新 | 自動削除せず、復旧案内と診断情報を表示。
+MAP-001 | 地図アプリなし | geo: handlerなし | 座標表示のみ。クラッシュしない。
+--- TABLE ---
+項目 | 目標 | 実装方針
+ファイルサイズ | 100MBまで | ストリーム解析。全文String化しない。
+UI応答 | 16ms目標、長処理でフリーズしない | 解析・集計をIsolateまたはDB側で実行。
+初回取込 | 一般端末で3分以内 | バッチ書込、Prepared Statement、索引の後作成も検討。
+再取込 | 差分量に比例 | sourceKey UNIQUEと影響期間再計算。
+DB容量 | 元JSONの20〜50%以下を目標 | 経路点の無制限保存を避け、MVPは訪問・区間中心。
+メモリ | ピーク200MB未満を目標 | 500〜2000件単位のバッチ。端末別に調整。
+--- TABLE ---
+層 | 対象 | 主要観点
+Unit | 鮮度、距離、期間、クラスタ、インサイト | 境界値、タイムゾーン、欠損、同値性、決定性。
+Parser fixture | 対応JSON→正規化DTO | 匿名化実データ、未知フィールド、順序違い、破損。
+Database | DAO、UNIQUE、transaction、migration | 重複、ロールバック、再起動、マイグレーション。
+Widget | 空状態、品質表示、カード、アクセシビリティ | 文字拡大、ダークモード、スクリーンリーダー。
+Integration | 共有受信→取込→ホーム→削除 | 実機Content URI、キャンセル、容量不足。
+Security | Manifest、ログ、バックアップ | INTERNETなし、座標ログなし、DBバックアップ除外。
+Performance | 大容量fixture | 処理時間、メモリ、フレーム停止、DB容量。
+--- TABLE ---
+1. dart format --set-exit-if-changed .
+2. flutter analyze
+3. flutter test test/unit test/database test/widget
+4. flutter test integration_test  # 対応環境で実行
+5. flutter build apk --release
+6. 最終Manifest確認（INTERNET権限なし）
+7. リリースAPK実機スモークテスト
+8. git diff --check
+--- TABLE ---
+段階 | 成果物 | 完了条件
+P0 サンプル確定 | 匿名化JSON、スキーマメモ、fixture | 実機データを読み、必須・任意フィールドを特定。
+P1 基盤 | Flutter骨格、Theme、DB、DI、ルーティング | 空画面、DB生成、品質ゲートが動く。
+P2 インポート | Preview、Parser、Validator、transaction | 標準・破損・重複fixtureが通る。
+P3 分析 | クラスタ、日次・月次、鮮度、インサイト | 純粋関数テストとDB再計算が通る。
+P4 UI | ホーム、カレンダー、日別、地点、設定 | 空・通常・古い・エラー状態を確認。
+P5 仕上げ | 削除、共有受信、外部地図、性能、A11y | リリースビルド実機でE2E完了。
+--- TABLE ---
+ID | 判断 | 状態 | 理由・影響
+ADR-001 | 完全ローカル | 採用 | 無料運用とプライバシーを優先し、サーバー・通信を持たない。
+ADR-002 | 手動インポート | 採用 | 正規の自動取得手段がないため、鮮度判定で負担を管理する。
+ADR-003 | 地図タイルなし | 採用 | 無料タイルへの過度な依存と規約・見た目の問題を避ける。
+ADR-004 | Flutter Android先行 | 採用 | 実装速度と将来のiOS移植性を両立する。
+ADR-005 | 元JSON非保持 | 採用 | 漏えい面積と容量を削減。再解析には再インポートが必要。
+ADR-006 | ルールベース分析 | 採用 | 説明可能性、オフライン、費用ゼロを優先。
+ADR-007 | グリッドクラスタ | 暫定採用 | 軽量で決定的。施設密集地の誤統合は残存リスク。
+--- TABLE ---
+リスク | 影響 | 緩和策
+エクスポート形式変更 | インポート不能 | SchemaDetectorとパーサー分離、fixture回帰、未知形式を安全拒否。
+手動更新の離脱 | 鮮度低下 | 15日以降の価値説明、更新後の差分成果を明示。
+地点誤統合 | インサイト誤差 | ラベル・除外、品質表示、将来の分割機能。
+距離の推定誤差 | 数値への不信 | 算出方法を保持し「推定」を明示。
+法務・規約解釈 | 公開差止めの可能性 | Google生成情報を最小化し、公開前に最終レビュー。
+無料アプリの見栄え | 継続率低下 | 地図模倣を避け、カード・ストーリー・カレンダーを磨く。
+--- TABLE ---
+実装開始条件
+匿名化された実機エクスポートJSONを1件以上取得し、MVP対応スキーマを確定した時点でP1〜P2へ進む。サンプルなしで推測実装を始めない。
