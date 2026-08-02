@@ -44,7 +44,9 @@ void main() {
       sparsePath(3),
       sparsePath(4),
     ]);
-    final counts = {for (final warning in result.warnings) warning.code: warning.count};
+    final counts = {
+      for (final warning in result.warnings) warning.code: warning.count,
+    };
 
     expect(result.isOk, isTrue);
     expect(result.approxRecordCount, 0);
