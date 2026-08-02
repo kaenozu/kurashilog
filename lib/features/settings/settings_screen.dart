@@ -31,16 +31,20 @@ class SettingsScreen extends ConsumerWidget {
                     trailing: SegmentedButton<WeekStart>(
                       segments: const [
                         ButtonSegment(
-                            value: WeekStart.monday, label: Text('月曜')),
+                          value: WeekStart.monday,
+                          label: Text('月曜'),
+                        ),
                         ButtonSegment(
-                            value: WeekStart.sunday, label: Text('日曜')),
+                          value: WeekStart.sunday,
+                          label: Text('日曜'),
+                        ),
                       ],
                       selected: {s.weekStart},
                       onSelectionChanged: (v) async {
                         await ref
                             .read(settingsUseCaseProvider)
                             .setWeekStart(v.first);
-                        ref.read(_settingsProvider.notifier).invalidate();
+                        ref.invalidate(_settingsProvider);
                       },
                     ),
                   ),
@@ -50,15 +54,21 @@ class SettingsScreen extends ConsumerWidget {
                     title: const Text('距離単位'),
                     trailing: SegmentedButton<DistanceUnit>(
                       segments: const [
-                        ButtonSegment(value: DistanceUnit.km, label: Text('km')),
-                        ButtonSegment(value: DistanceUnit.m, label: Text('m')),
+                        ButtonSegment(
+                          value: DistanceUnit.km,
+                          label: Text('km'),
+                        ),
+                        ButtonSegment(
+                          value: DistanceUnit.m,
+                          label: Text('m'),
+                        ),
                       ],
                       selected: {s.distanceUnit},
                       onSelectionChanged: (v) async {
                         await ref
                             .read(settingsUseCaseProvider)
                             .setDistanceUnit(v.first);
-                        ref.read(_settingsProvider.notifier).invalidate();
+                        ref.invalidate(_settingsProvider);
                       },
                     ),
                   ),
@@ -66,7 +76,6 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-
             Card(
               child: Column(
                 children: [
@@ -92,7 +101,6 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-
             Card(
               child: ExpansionTile(
                 leading: const Icon(Icons.privacy_tip_outlined),
@@ -103,16 +111,14 @@ class SettingsScreen extends ConsumerWidget {
                   Text(
                     '・位置履歴は端末内だけで処理され、ネットワークへ送信されません。\n'
                     '・アプリは通信権限（INTERNET）を持ちません。\n'
-                    '・元の JSON ファイルは保存せず、解析後に一時ファイルも削除されます。\n'
-                    '・OS のバックアップ対象から位置データを除外しています。\n'
-                    '・削除はオフラインで完了し、再起動後も復元されません。',
+                    '・元の JSON ファイルは保存せず、解析後に一時ファイルを削除します。\n'
+                    '・OS のバックアップ対象から位置データを除外しています。',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-
             Card(
               child: ListTile(
                 leading: const Icon(Icons.school_outlined),
@@ -139,7 +145,9 @@ class SettingsScreen extends ConsumerWidget {
       builder: (context) => AlertDialog(
         title: const Text('すべてのデータを削除'),
         content: const Text(
-            '位置履歴・地点ラベル・分析結果をすべて削除します。\nこの操作は取り消せません。よろしいですか？'),
+          '位置履歴・地点ラベル・分析結果をすべて削除します。\n'
+          'この操作は取り消せません。よろしいですか？',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -167,8 +175,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-final _settingsProvider =
-    FutureProvider.autoDispose<AppSettingsData>(
+final _settingsProvider = FutureProvider.autoDispose<AppSettingsData>(
   (ref) => ref.watch(settingsUseCaseProvider).load(),
 );
 
@@ -179,11 +186,14 @@ class _OnboardingRedirect extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final done = ref.watch(_onboardingDoneProvider);
     return done.when(
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      ),
       error: (e, _) => const Scaffold(body: SizedBox()),
       data: (done) {
         if (!done) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
             Navigator.of(context).pushReplacement(MaterialPageRoute(
               builder: (_) => const OnboardingScreen(),
             ));
