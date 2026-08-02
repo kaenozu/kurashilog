@@ -5,15 +5,15 @@
       "endTime": "2026-07-20T01:00:00+09:00",
       "timelinePath": [
         {
-          "point": "35.666379\u00b0, 139.7583398\u00b0",
+          "point": "35.222222\u00b0, 139.333333\u00b0",
           "time": "2026-07-20T00:10:00+09:00"
         },
         {
-          "point": "35.6710524\u00b0, 139.760172\u00b0",
+          "point": "35.333333\u00b0, 139.444444\u00b0",
           "time": "2026-07-20T00:30:00+09:00"
         },
         {
-          "point": "35.6790000\u00b0, 139.7650000\u00b0",
+          "point": "35.444444\u00b0, 139.555555\u00b0",
           "time": "2026-07-20T00:50:00+09:00"
         }
       ]
@@ -23,12 +23,12 @@
       "endTime": "2026-07-20T02:00:00+09:00",
       "visit": {
         "topCandidate": {
-          "placeId": "ANON-PLACE-PARK",
+          "placeId": "ANON-PLACE-AAA",
           "semanticType": "UNKNOWN",
           "placeLocation": {
-            "latLng": "35.666379\u00b0, 139.7583398\u00b0"
+            "latLng": "35.222222\u00b0, 139.333333\u00b0"
           },
-          "probability": 0.41353073716163635
+          "probability": 0.41
         }
       }
     },
@@ -37,10 +37,10 @@
       "endTime": "2026-07-20T03:00:00+09:00",
       "activity": {
         "start": {
-          "latLng": "35.666379\u00b0, 139.7583398\u00b0"
+          "latLng": "35.222222\u00b0, 139.333333\u00b0"
         },
         "end": {
-          "latLng": "35.697308\u00b0, 139.786073\u00b0"
+          "latLng": "35.555555\u00b0, 139.666666\u00b0"
         },
         "topCandidate": {
           "type": "IN_VEHICLE",
@@ -54,10 +54,10 @@
       "endTime": "2026-07-20T04:00:00+09:00",
       "activity": {
         "start": {
-          "latLng": "35.697308\u00b0, 139.786073\u00b0"
+          "latLng": "35.555555\u00b0, 139.666666\u00b0"
         },
         "end": {
-          "latLng": "35.697525\u00b0, 139.832455\u00b0"
+          "latLng": "35.777777\u00b0, 139.888888\u00b0"
         },
         "topCandidate": {
           "type": "UNKNOWN_ACTIVITY_TYPE",
@@ -70,10 +70,10 @@
       "endTime": "2026-07-20T05:00:00+09:00",
       "visit": {
         "topCandidate": {
-          "placeId": "ANON-PLACE-HOME",
+          "placeId": "ANON-PLACE-BBB",
           "semanticType": "UNKNOWN",
           "placeLocation": {
-            "latLng": "35.697308\u00b0, 139.786073\u00b0"
+            "latLng": "35.555555\u00b0, 139.666666\u00b0"
           },
           "probability": 0.8
         }

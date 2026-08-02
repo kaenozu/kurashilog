@@ -55,8 +55,8 @@ void main() {
       expect(timelineMovement.distanceMethod, DistanceMethod.estimatedPath);
       expect(timelineMovement.distanceM, greaterThan(0));
       expect(timelineMovement.activityType, isNull);
-      expect(timelineMovement.startLatLng!.latE7, 356663790);
-      expect(timelineMovement.startLatLng!.lngE7, 1397583398);
+      expect(timelineMovement.startLatLng!.latE7, 352222220);
+      expect(timelineMovement.startLatLng!.lngE7, 1393333330);
     });
 
     test(
@@ -75,8 +75,8 @@ void main() {
 
         expect(vehicle.distanceMethod, DistanceMethod.recorded);
         expect(vehicle.distanceM, 24507);
-        expect(vehicle.startLatLng!.latE7, 356663790);
-        expect(vehicle.startLatLng!.lngE7, 1397583398);
+        expect(vehicle.startLatLng!.latE7, 352222220);
+        expect(vehicle.startLatLng!.lngE7, 1393333330);
         expect(vehicle.startLatLng!.latE7, isNot(vehicle.endLatLng!.latE7));
       },
     );
@@ -113,12 +113,117 @@ void main() {
             .toList();
 
         final parkVisit = records.whereType<NormalizedVisit>().singleWhere(
-          (v) => v.latLng.latE7 == 356663790 && v.latLng.lngE7 == 1397583398,
+          (v) => v.latLng.latE7 == 352222220 && v.latLng.lngE7 == 1393333330,
         );
 
         expect(parkVisit.latLng.isValid, isTrue);
-        expect(parkVisit.latLng.latE7, 356663790);
-        expect(parkVisit.latLng.lngE7, 1397583398);
+        expect(parkVisit.latLng.latE7, 352222220);
+        expect(parkVisit.latLng.lngE7, 1393333330);
+      },
+    );
+
+    test('preview count matches the number of parseable records', () async {
+      final preview = await parser.preview(
+        Stream.value(await File(fixturePath).readAsBytes()),
+        CancellationToken(),
+      );
+      final records = await parser
+          .parse(
+            Stream.value(await File(fixturePath).readAsBytes()),
+            CancellationToken(),
+          )
+          .toList();
+
+      expect(preview.approxRecordCount, records.length);
+      expect(records, hasLength(5));
+    });
+  });
+
+  group('unrecordable segments', () {
+    test(
+      'segment without visit/activity/timelinePath is dropped with warning',
+      () async {
+        const json = '''
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-07-21T00:00:00+09:00",
+      "endTime": "2026-07-21T01:00:00+09:00",
+      "walking": {"some": "unknown"}
+    }
+  ]
+}
+''';
+        final preview = await parser.preview(
+          Stream.value(utf8.encode(json)),
+          CancellationToken(),
+        );
+        final records = await parser
+            .parse(Stream.value(utf8.encode(json)), CancellationToken())
+            .toList();
+
+        expect(records, isEmpty);
+        expect(preview.approxRecordCount, 0);
+        expect(preview.warnings.any((w) => w.code == 'PAR-001'), isTrue);
+      },
+    );
+
+    test('visit without coordinate is dropped with PAR-003 warning', () async {
+      const json = '''
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-07-20T00:00:00+09:00",
+      "endTime": "2026-07-20T01:00:00+09:00",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-NO-COORD"
+        }
+      }
+    }
+  ]
+}
+''';
+      final preview = await parser.preview(
+        Stream.value(utf8.encode(json)),
+        CancellationToken(),
+      );
+
+      expect(preview.approxRecordCount, 0);
+      expect(preview.warnings.any((w) => w.code == 'PAR-003'), isTrue);
+      expect(preview.warnings.any((w) => w.code == 'PAR-002'), isFalse);
+    });
+
+    test(
+      'single-point timelinePath is not recorded and warns PAR-004',
+      () async {
+        const json = '''
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-07-20T00:00:00+09:00",
+      "endTime": "2026-07-20T01:00:00+09:00",
+      "timelinePath": [
+        {
+          "point": "35.666379\\u00b0, 139.7583398\\u00b0",
+          "time": "2026-07-20T00:10:00+09:00"
+        }
+      ]
+    }
+  ]
+}
+''';
+        final preview = await parser.preview(
+          Stream.value(utf8.encode(json)),
+          CancellationToken(),
+        );
+        final records = await parser
+            .parse(Stream.value(utf8.encode(json)), CancellationToken())
+            .toList();
+
+        expect(records, isEmpty);
+        expect(preview.approxRecordCount, 0);
+        expect(preview.warnings.any((w) => w.code == 'PAR-004'), isTrue);
       },
     );
 

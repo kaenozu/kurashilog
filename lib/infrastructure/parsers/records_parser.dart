@@ -57,7 +57,7 @@ class RecordsTimelineParser implements TimelineParser {
       source,
       token,
       onSegment: (segment) {
-        if (_segmentToRecord(segment) != null) count++;
+        if (_segmentToRecord(segment, warn: warn) != null) count++;
         final (start, end) = _segmentRange(segment);
         mergeRange(start, end);
       },
@@ -96,7 +96,8 @@ class RecordsTimelineParser implements TimelineParser {
 
     if (legacyPoints.isNotEmpty) {
       final derived = _deriveLegacyRecords(legacyPoints);
-      count = derived.length;
+      // 生の点列を個別カウントしていた分を導出レコード数へ置き換える。
+      count = count - legacyPoints.length + derived.length;
       for (final record in derived) {
         mergeRange(record.startAtUtc, record.endAtUtc);
       }
@@ -253,13 +254,28 @@ class RecordsTimelineParser implements TimelineParser {
     onUnsupported();
   }
 
-  NormalizedRecord? _segmentToRecord(Map<String, Object?> segment) {
+  /// セグメントを正規化レコードへ変換する。
+  ///
+  /// Preview と 本取込 の判定を共有するため、レコード化できないセグメントは
+  /// [warn] を介して理由を報告する。呼び出し側が [warn] を渡さない場合は
+  /// 警告を発しない（破棄理由の集計を Preview 側に任せる）。
+  NormalizedRecord? _segmentToRecord(
+    Map<String, Object?> segment, {
+    void Function(String code, String message)? warn,
+  }) {
     final (start, end) = _segmentRange(segment);
-    if (start == null || end == null) return null;
+    if (start == null || end == null) {
+      warn?.call('PAR-002', '時刻情報が不十分なセグメントを無視しました');
+      return null;
+    }
 
     final visit = segment['visit'];
     if (visit is Map<String, Object?>) {
-      return _visitToRecord(visit, start, end);
+      final record = _visitToRecord(visit, start, end);
+      if (record == null) {
+        warn?.call('PAR-003', '座標情報が無い訪問を無視しました');
+      }
+      return record;
     }
 
     final activity = segment['activity'];
@@ -275,11 +291,18 @@ class RecordsTimelineParser implements TimelineParser {
     }
 
     // 実Android版エクスポートの timelinePath のみのセグメントは、経路点列を持つ
-    // 移動として扱う。点が 2 未満では距離を推定できないため破棄する。
-    final path = _timelinePathCoordinates(segment['timelinePath']);
-    if (path.length >= 2) {
-      return _timelinePathToMovement(start, end, path);
+    // 移動として扱う。点が 2 点未満では距離を推定できないため warning に分類する。
+    final timelinePath = segment['timelinePath'];
+    if (timelinePath is List && timelinePath.isNotEmpty) {
+      final path = _timelinePathCoordinates(timelinePath);
+      if (path.length >= 2) {
+        return _timelinePathToMovement(start, end, path);
+      }
+      warn?.call('PAR-004', '経路点が不足した移動セグメントを無視しました');
+      return null;
     }
+    // 既知の種別を持たないセグメントはレコード化せず warning に分類する。
+    warn?.call('PAR-001', '未対応のセグメントを無視しました');
     return null;
   }
 
