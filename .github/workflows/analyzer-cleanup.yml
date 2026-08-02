@@ -1,0 +1,74 @@
+name: Analyzer cleanup
+
+on:
+  push:
+    branches:
+      - agent/fix-p0-foundation
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fix-p0-foundation
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Apply deterministic analyzer fixes
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              'lib/application/use_cases/dashboard_use_case.dart': [
+                  ("import '../models/persistence_models.dart';\n", ''),
+              ],
+              'lib/domain/models/source_key.dart': [
+                  ("import 'dart:typed_data';\n", ''),
+              ],
+              'lib/domain/models/summaries.dart': [
+                  ("import 'data_quality.dart';\n", ''),
+              ],
+              'lib/features/day_detail/day_detail_screen.dart': [
+                  ("if (entry.distanceM != null) '${_km(entry.distanceM!)}',", "if (entry.distanceM != null) _km(entry.distanceM!),"),
+              ],
+              'lib/features/import_timeline/import_flow_screen.dart': [
+                  ("import '../../shared/widgets.dart';\n", ''),
+              ],
+              'lib/infrastructure/database/kurashilog_repository_impl.dart': [
+                  ("import 'tables.dart';\n", ''),
+              ],
+          }
+
+          for filename, edits in replacements.items():
+              path = Path(filename)
+              text = path.read_text()
+              for old, new in edits:
+                  if old not in text:
+                      raise SystemExit(f'Expected text not found in {filename}: {old!r}')
+                  text = text.replace(old, new, 1)
+              path.write_text(text)
+
+          Path('.github/workflows/analyzer-cleanup.yml').unlink()
+          PY
+
+          dart format lib test
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lib test .github/workflows/analyzer-cleanup.yml
+          git commit -m "fix: clear analyzer findings"
+          git push origin HEAD:agent/fix-p0-foundation
