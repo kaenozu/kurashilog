@@ -20,8 +20,9 @@ enum DataQuality {
 
   /// 欠落率が高い場合に指定段階だけ品質を下げる。
   DataQuality downgrade([int steps = 1]) {
-    final safeIndex =
-        (index + steps).clamp(0, DataQuality.values.length - 1).toInt();
+    final safeIndex = (index + steps)
+        .clamp(0, DataQuality.values.length - 1)
+        .toInt();
     return DataQuality.values[safeIndex];
   }
 }

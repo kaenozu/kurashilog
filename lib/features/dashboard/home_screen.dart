@@ -25,9 +25,9 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'タイムラインを取り込む',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () {
-              Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const ImportFlowScreen(),
-              ));
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ImportFlowScreen()),
+              );
             },
           ),
         ],
@@ -41,11 +41,11 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-final _dashboardProvider =
-    FutureProvider.autoDispose.family<DashboardData, String>((ref, month) {
-  ref.watch(dashboardRefreshProvider);
-  return ref.watch(dashboardUseCaseProvider).loadHome(selectedMonth: month);
-});
+final _dashboardProvider = FutureProvider.autoDispose
+    .family<DashboardData, String>((ref, month) {
+      ref.watch(dashboardRefreshProvider);
+      return ref.watch(dashboardUseCaseProvider).loadHome(selectedMonth: month);
+    });
 
 class _HomeBody extends ConsumerWidget {
   const _HomeBody({required this.dashboard});
@@ -57,9 +57,9 @@ class _HomeBody extends ConsumerWidget {
     if (!dashboard.hasData) {
       return _EmptyHome(
         onImport: () {
-          Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const ImportFlowScreen(),
-          ));
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ImportFlowScreen()));
         },
       );
     }
@@ -94,8 +94,9 @@ class _HomeBody extends ConsumerWidget {
           const SizedBox(height: 8),
           Text(
             dashboard.monthLabel,
-            style: theme.textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w700),
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
           ),
           if (freshness.quality == DataQuality.low ||
               freshness.quality == DataQuality.quiteLow ||
@@ -105,9 +106,9 @@ class _HomeBody extends ConsumerWidget {
               quality: freshness.quality,
               staleDays: freshness.staleDays,
               onImport: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => const ImportFlowScreen(),
-                ));
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const ImportFlowScreen()),
+                );
               },
             ),
           ],
@@ -195,7 +196,8 @@ class _EmptyHome extends StatelessWidget {
         EmptyState(
           icon: Icons.map_outlined,
           title: 'まだデータがありません',
-          message: 'Google マップのタイムラインから書き出した JSON を\n'
+          message:
+              'Google マップのタイムラインから書き出した JSON を\n'
               '取り込むと、生活の変化を分析できます。\n'
               'データは端末内だけで処理されます。',
           action: FilledButton.icon(
@@ -258,8 +260,9 @@ class _StaleBanner extends StatelessWidget {
               children: [
                 Text(
                   'データが $staleDays 日更新されていません',
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(color: scheme.onErrorContainer),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -267,17 +270,15 @@ class _StaleBanner extends StatelessWidget {
                           quality == DataQuality.historyOnly
                       ? '現在の傾向の精度が低下しています。再エクスポートして更新してください。'
                       : '最新の記録を取り込むと、より正確な分析ができます。',
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: scheme.onErrorContainer),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onErrorContainer,
+                  ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 8),
-          FilledButton.tonal(
-            onPressed: onImport,
-            child: const Text('更新'),
-          ),
+          FilledButton.tonal(onPressed: onImport, child: const Text('更新')),
         ],
       ),
     );
@@ -315,8 +316,9 @@ class _InsightCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.titleSmall
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(body, style: theme.textTheme.bodyMedium),
@@ -331,8 +333,8 @@ class _InsightCard extends StatelessWidget {
 }
 
 IconData _iconFor(MetricIcon icon) => switch (icon) {
-      MetricIcon.walking => Icons.directions_walk,
-      MetricIcon.route => Icons.route,
-      MetricIcon.place => Icons.place,
-      MetricIcon.explore => Icons.explore,
-    };
+  MetricIcon.walking => Icons.directions_walk,
+  MetricIcon.route => Icons.route,
+  MetricIcon.place => Icons.place,
+  MetricIcon.explore => Icons.explore,
+};

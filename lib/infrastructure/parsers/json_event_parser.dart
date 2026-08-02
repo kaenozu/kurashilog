@@ -88,7 +88,10 @@ class JsonEventParser {
       _skipWhitespace();
       if (_pos >= _buffer.length) return null;
       if (_rootDone) {
-        throw JsonParseException('trailing data after root value', offset: _pos);
+        throw JsonParseException(
+          'trailing data after root value',
+          offset: _pos,
+        );
       }
 
       if (_stack.isEmpty) {
@@ -105,7 +108,10 @@ class JsonEventParser {
             final b = _buffer[_pos];
             if (b == 0x7D) return _closeContainer(isObject: true);
             if (b != 0x22) {
-              throw JsonParseException('expected object key or "}"', offset: _pos);
+              throw JsonParseException(
+                'expected object key or "}"',
+                offset: _pos,
+              );
             }
             _beginString(isKey: true);
             return _continueString();
@@ -202,9 +208,9 @@ class JsonEventParser {
       if (b == 0x22) {
         _inString = false;
         final raw = _stringRaw.takeBytes();
-        final decoded = jsonDecode(
-          '"${utf8.decode(raw, allowMalformed: false)}"',
-        ) as String;
+        final decoded =
+            jsonDecode('"${utf8.decode(raw, allowMalformed: false)}"')
+                as String;
         if (_stringIsKey) {
           final frame = _stack.last;
           if (!frame.isObject || frame.state != 0) {
@@ -217,7 +223,10 @@ class JsonEventParser {
         return JsonEvent(JsonEventType.value, value: decoded);
       }
       if (b < 0x20) {
-        throw JsonParseException('control character in string', offset: _pos - 1);
+        throw JsonParseException(
+          'control character in string',
+          offset: _pos - 1,
+        );
       }
       _stringRaw.addByte(b);
       if (_stringRaw.length > _maxStringBytes) {
@@ -256,8 +265,7 @@ class JsonEventParser {
         return const _ScalarResult(null);
     }
 
-    if (token.length > _maxNumberChars ||
-        !_jsonNumber.hasMatch(token)) {
+    if (token.length > _maxNumberChars || !_jsonNumber.hasMatch(token)) {
       throw JsonParseException('invalid scalar: $token', offset: start);
     }
     final value = num.tryParse(token);
@@ -340,13 +348,9 @@ class JsonEventParser {
 }
 
 class _Frame {
-  _Frame.object()
-      : isObject = true,
-        state = 0;
+  _Frame.object() : isObject = true, state = 0;
 
-  _Frame.array()
-      : isObject = false,
-        state = 0;
+  _Frame.array() : isObject = false, state = 0;
 
   final bool isObject;
   int state;

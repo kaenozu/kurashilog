@@ -17,40 +17,48 @@ void main() {
 
   test('updates import and label rows by primary key', () async {
     final startedAt = DateTime.utc(2026, 7, 1);
-    final importId = await repository.insertImport(ImportedFileRecord(
-      id: 0,
-      fileHash: 'hash',
-      schemaType: 'timeline-records',
-      startedAt: startedAt,
-      status: 'processing',
-    ));
+    final importId = await repository.insertImport(
+      ImportedFileRecord(
+        id: 0,
+        fileHash: 'hash',
+        schemaType: 'timeline-records',
+        startedAt: startedAt,
+        status: 'processing',
+      ),
+    );
 
-    await repository.updateImport(ImportedFileRecord(
-      id: importId,
-      fileHash: 'hash',
-      schemaType: 'timeline-records',
-      startedAt: startedAt,
-      completedAt: startedAt.add(const Duration(minutes: 1)),
-      status: 'completed',
-      addedVisits: 2,
-    ));
+    await repository.updateImport(
+      ImportedFileRecord(
+        id: importId,
+        fileHash: 'hash',
+        schemaType: 'timeline-records',
+        startedAt: startedAt,
+        completedAt: startedAt.add(const Duration(minutes: 1)),
+        status: 'completed',
+        addedVisits: 2,
+      ),
+    );
     final latest = await repository.latestCompletedImport();
     expect(latest?.id, importId);
     expect(latest?.addedVisits, 2);
 
-    final labelId = await repository.insertLabel(StoredLabel(
-      id: 0,
-      displayName: '旧名称',
-      createdAt: startedAt,
-      updatedAt: startedAt,
-    ));
-    await repository.updateLabel(StoredLabel(
-      id: labelId,
-      displayName: '新名称',
-      isBasePlace: true,
-      createdAt: startedAt,
-      updatedAt: startedAt.add(const Duration(minutes: 1)),
-    ));
+    final labelId = await repository.insertLabel(
+      StoredLabel(
+        id: 0,
+        displayName: '旧名称',
+        createdAt: startedAt,
+        updatedAt: startedAt,
+      ),
+    );
+    await repository.updateLabel(
+      StoredLabel(
+        id: labelId,
+        displayName: '新名称',
+        isBasePlace: true,
+        createdAt: startedAt,
+        updatedAt: startedAt.add(const Duration(minutes: 1)),
+      ),
+    );
     final label = await repository.labelById(labelId);
     expect(label?.displayName, '新名称');
     expect(label?.isBasePlace, isTrue);
@@ -58,13 +66,15 @@ void main() {
 
   test('cluster rebuild preserves label and exclusion by stable key', () async {
     final at = DateTime.utc(2026, 7, 1);
-    final labelId = await repository.insertLabel(StoredLabel(
-      id: 0,
-      displayName: '自宅',
-      isBasePlace: true,
-      createdAt: at,
-      updatedAt: at,
-    ));
+    final labelId = await repository.insertLabel(
+      StoredLabel(
+        id: 0,
+        displayName: '自宅',
+        isBasePlace: true,
+        createdAt: at,
+        updatedAt: at,
+      ),
+    );
     await repository.replaceAllClusters([
       _cluster(at, centroidLatE7: 356812360),
     ]);
@@ -106,10 +116,7 @@ void main() {
   });
 }
 
-StoredCluster _cluster(
-  DateTime at, {
-  required int centroidLatE7,
-}) =>
+StoredCluster _cluster(DateTime at, {required int centroidLatE7}) =>
     StoredCluster(
       id: 0,
       stableKey: 'cluster|3568123|13976712',

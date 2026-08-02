@@ -60,20 +60,20 @@ class CalendarScreen extends ConsumerWidget {
   }
 }
 
-final _monthlyDaysProvider =
-    FutureProvider.autoDispose.family<Map<String, bool>, String>((ref, month) async {
-  ref.watch(dashboardRefreshProvider);
-  final repo = ref.watch(repositoryProvider);
-  final parts = month.split('-');
-  final y = int.parse(parts[0]);
-  final m = int.parse(parts[1]);
-  final daysInMonth = DateTime(y, m + 1, 0).day;
-  final rows = await repo.dailySummariesBetween(
-    '$month-01',
-    '$month-${daysInMonth.toString().padLeft(2, '0')}',
-  );
-  return {for (final r in rows) r.localDate: r.outingFlag};
-});
+final _monthlyDaysProvider = FutureProvider.autoDispose
+    .family<Map<String, bool>, String>((ref, month) async {
+      ref.watch(dashboardRefreshProvider);
+      final repo = ref.watch(repositoryProvider);
+      final parts = month.split('-');
+      final y = int.parse(parts[0]);
+      final m = int.parse(parts[1]);
+      final daysInMonth = DateTime(y, m + 1, 0).day;
+      final rows = await repo.dailySummariesBetween(
+        '$month-01',
+        '$month-${daysInMonth.toString().padLeft(2, '0')}',
+      );
+      return {for (final r in rows) r.localDate: r.outingFlag};
+    });
 
 final repositoryHasDataProvider = FutureProvider.autoDispose<bool>((ref) async {
   ref.watch(dashboardRefreshProvider);
@@ -102,9 +102,7 @@ class _CalendarBody extends ConsumerWidget {
 
     final cells = <Widget>[];
     for (final label in _weekLabels) {
-      cells.add(Center(
-        child: Text(label, style: theme.textTheme.labelSmall),
-      ));
+      cells.add(Center(child: Text(label, style: theme.textTheme.labelSmall)));
     }
     for (var i = 0; i < leadingBlanks; i++) {
       cells.add(const SizedBox.shrink());
@@ -114,19 +112,23 @@ class _CalendarBody extends ConsumerWidget {
       final outing = days[dateStr] ?? false;
       final hasRecord = days.containsKey(dateStr);
       final isToday = today.year == y && today.month == m && today.day == d;
-      cells.add(_DayCell(
-        day: d,
-        outing: outing,
-        hasRecord: hasRecord,
-        isToday: isToday,
-        onTap: hasRecord
-            ? () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => DayDetailScreen(localDate: dateStr),
-                ));
-              }
-            : null,
-      ));
+      cells.add(
+        _DayCell(
+          day: d,
+          outing: outing,
+          hasRecord: hasRecord,
+          isToday: isToday,
+          onTap: hasRecord
+              ? () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DayDetailScreen(localDate: dateStr),
+                    ),
+                  );
+                }
+              : null,
+        ),
+      );
     }
 
     return ListView(
@@ -136,17 +138,20 @@ class _CalendarBody extends ConsumerWidget {
           children: [
             Text(
               '$y年$m月',
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const Spacer(),
             IconButton(
               tooltip: '月間ストーリー',
               icon: const Icon(Icons.auto_stories_outlined),
               onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => MonthStoryScreen(yearMonth: month),
-                ));
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => MonthStoryScreen(yearMonth: month),
+                  ),
+                );
               },
             ),
           ],
@@ -178,18 +183,19 @@ class _CalendarBody extends ConsumerWidget {
         Text(
           'タップするとその日のタイムラインを開きます。',
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
   }
 
   Widget _legendDot(ThemeData theme, {required Color color}) => Container(
-        width: 14,
-        height: 14,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-      );
+    width: 14,
+    height: 14,
+    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  );
 }
 
 class _DayCell extends StatelessWidget {
@@ -213,8 +219,8 @@ class _DayCell extends StatelessWidget {
     final color = !hasRecord
         ? scheme.surfaceContainerHighest
         : outing
-            ? scheme.primary
-            : scheme.primaryContainer;
+        ? scheme.primary
+        : scheme.primaryContainer;
 
     return InkWell(
       onTap: onTap,
@@ -224,18 +230,20 @@ class _DayCell extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           borderRadius: BorderRadius.circular(8),
-          border: isToday ? Border.all(color: scheme.outline, width: 1.5) : null,
+          border: isToday
+              ? Border.all(color: scheme.outline, width: 1.5)
+              : null,
         ),
         child: Text(
           '$day',
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: !hasRecord
-                    ? scheme.onSurfaceVariant
-                    : outing
-                        ? scheme.onPrimary
-                        : scheme.onPrimaryContainer,
-                fontWeight: isToday ? FontWeight.w800 : null,
-              ),
+            color: !hasRecord
+                ? scheme.onSurfaceVariant
+                : outing
+                ? scheme.onPrimary
+                : scheme.onPrimaryContainer,
+            fontWeight: isToday ? FontWeight.w800 : null,
+          ),
         ),
       ),
     );

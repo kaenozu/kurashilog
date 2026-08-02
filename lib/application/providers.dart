@@ -66,8 +66,9 @@ final externalMapOpenerProvider = Provider<ExternalMapOpener>(
 );
 
 /// ホームで表示する月（YYYY-MM）。
-final selectedMonthProvider =
-    StateProvider<String>((ref) => _currentYearMonth());
+final selectedMonthProvider = StateProvider<String>(
+  (ref) => _currentYearMonth(),
+);
 
 /// ダッシュボード再読込トリガー。
 final dashboardRefreshProvider = StateProvider<int>((ref) => 0);

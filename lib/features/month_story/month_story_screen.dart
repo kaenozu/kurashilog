@@ -59,17 +59,18 @@ class _MonthStoryScreenState extends ConsumerState<MonthStoryScreen> {
     final m = int.parse(parts[1]);
     final d = DateTime(y, m + delta, 1);
     setState(() {
-      _month = '${d.year.toString().padLeft(4, '0')}-'
+      _month =
+          '${d.year.toString().padLeft(4, '0')}-'
           '${d.month.toString().padLeft(2, '0')}';
     });
   }
 }
 
-final _monthStoryProvider =
-    FutureProvider.autoDispose.family<MonthStoryData, String>((ref, month) {
-  ref.watch(dashboardRefreshProvider);
-  return ref.watch(dashboardUseCaseProvider).monthStory(month);
-});
+final _monthStoryProvider = FutureProvider.autoDispose
+    .family<MonthStoryData, String>((ref, month) {
+      ref.watch(dashboardRefreshProvider);
+      return ref.watch(dashboardUseCaseProvider).monthStory(month);
+    });
 
 class _StoryBody extends StatelessWidget {
   const _StoryBody({required this.data});
@@ -95,14 +96,16 @@ class _StoryBody extends StatelessWidget {
       children: [
         Text(
           monthLabel,
-          style: theme.textTheme.headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style: theme.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 4),
         Text(
           'この月の生活のまとめです。',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 16),
         Wrap(
@@ -203,19 +206,22 @@ class _StoryBody extends StatelessWidget {
         children: [
           Text(
             label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: scheme.onPrimaryContainer),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: scheme.onPrimaryContainer,
+            ),
           ),
           Text(
             value,
-            style: theme.textTheme.titleMedium
-                ?.copyWith(color: scheme.onPrimaryContainer),
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: scheme.onPrimaryContainer,
+            ),
           ),
           if (delta != null)
             Text(
               delta,
-              style: theme.textTheme.labelSmall
-                  ?.copyWith(color: scheme.onPrimaryContainer),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onPrimaryContainer,
+              ),
             ),
         ],
       ),
@@ -253,9 +259,8 @@ class _StoryBody extends StatelessWidget {
     return '前月比 ${r > 0 ? '+' : ''}$r%';
   }
 
-  String _km(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _km(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 
   String _formatMonth(String ym) {
     final parts = ym.split('-');

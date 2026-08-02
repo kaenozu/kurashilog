@@ -19,11 +19,12 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<ImportedFileRecord?> latestCompletedImport() async {
-    final rows = await (_db.select(_db.timelineImports)
-          ..where((table) => table.status.equals('completed'))
-          ..orderBy([(table) => OrderingTerm.desc(table.id)])
-          ..limit(1))
-        .get();
+    final rows =
+        await (_db.select(_db.timelineImports)
+              ..where((table) => table.status.equals('completed'))
+              ..orderBy([(table) => OrderingTerm.desc(table.id)])
+              ..limit(1))
+            .get();
     return rows.isEmpty ? null : _importToDomain(rows.first);
   }
 
@@ -34,9 +35,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   @override
   Future<void> updateImport(ImportedFileRecord record) async {
     if (record.id <= 0) throw ArgumentError.value(record.id, 'record.id');
-    final updated = await (_db.update(_db.timelineImports)
-          ..where((table) => table.id.equals(record.id)))
-        .write(_importUpdateCompanion(record));
+    final updated =
+        await (_db.update(_db.timelineImports)
+              ..where((table) => table.id.equals(record.id)))
+            .write(_importUpdateCompanion(record));
     if (updated != 1) {
       throw StateError('Expected to update one import row, updated $updated');
     }
@@ -50,12 +52,12 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<DateTime?> latestActivityAt() async {
-    final visitRow = await (_db.selectOnly(_db.visits)
-          ..addColumns([_db.visits.endAtUtc.max()]))
-        .getSingle();
-    final movementRow = await (_db.selectOnly(_db.movements)
-          ..addColumns([_db.movements.endAtUtc.max()]))
-        .getSingle();
+    final visitRow = await (_db.selectOnly(
+      _db.visits,
+    )..addColumns([_db.visits.endAtUtc.max()])).getSingle();
+    final movementRow = await (_db.selectOnly(
+      _db.movements,
+    )..addColumns([_db.movements.endAtUtc.max()])).getSingle();
     final visit = visitRow.read(_db.visits.endAtUtc.max());
     final movement = movementRow.read(_db.movements.endAtUtc.max());
     if (visit == null) return movement;
@@ -65,12 +67,12 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<DateTime?> earliestActivityAt() async {
-    final visitRow = await (_db.selectOnly(_db.visits)
-          ..addColumns([_db.visits.startAtUtc.min()]))
-        .getSingle();
-    final movementRow = await (_db.selectOnly(_db.movements)
-          ..addColumns([_db.movements.startAtUtc.min()]))
-        .getSingle();
+    final visitRow = await (_db.selectOnly(
+      _db.visits,
+    )..addColumns([_db.visits.startAtUtc.min()])).getSingle();
+    final movementRow = await (_db.selectOnly(
+      _db.movements,
+    )..addColumns([_db.movements.startAtUtc.min()])).getSingle();
     final visit = visitRow.read(_db.visits.startAtUtc.min());
     final movement = movementRow.read(_db.movements.startAtUtc.min());
     if (visit == null) return movement;
@@ -83,14 +85,15 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     DateTime startUtc,
     DateTime endUtc,
   ) async {
-    final rows = await (_db.select(_db.visits)
-          ..where(
-            (table) =>
-                table.endAtUtc.isBiggerOrEqualValue(startUtc) &
-                table.startAtUtc.isSmallerThanValue(endUtc),
-          )
-          ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
-        .get();
+    final rows =
+        await (_db.select(_db.visits)
+              ..where(
+                (table) =>
+                    table.endAtUtc.isBiggerOrEqualValue(startUtc) &
+                    table.startAtUtc.isSmallerThanValue(endUtc),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
+            .get();
     return rows.map(_visitToDomain).toList();
   }
 
@@ -99,14 +102,15 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     DateTime startUtc,
     DateTime endUtc,
   ) async {
-    final rows = await (_db.select(_db.movements)
-          ..where(
-            (table) =>
-                table.endAtUtc.isBiggerOrEqualValue(startUtc) &
-                table.startAtUtc.isSmallerThanValue(endUtc),
-          )
-          ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
-        .get();
+    final rows =
+        await (_db.select(_db.movements)
+              ..where(
+                (table) =>
+                    table.endAtUtc.isBiggerOrEqualValue(startUtc) &
+                    table.startAtUtc.isSmallerThanValue(endUtc),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
+            .get();
     return rows.map(_movementToDomain).toList();
   }
 
@@ -221,8 +225,7 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         _db.placeLabels,
         _db.placeLabels.id.equalsExp(_db.placeClusters.labelId),
       ),
-    ])
-      ..where(_db.placeClusters.id.equals(id));
+    ])..where(_db.placeClusters.id.equals(id));
     final rows = await query.get();
     if (rows.isEmpty) return null;
     return _clusterToDomain(
@@ -233,17 +236,19 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<void> updateClusterLabel(int clusterId, int? labelId) async {
-    final updated = await (_db.update(_db.placeClusters)
-          ..where((table) => table.id.equals(clusterId)))
-        .write(PlaceClustersCompanion(labelId: Value(labelId)));
+    final updated =
+        await (_db.update(_db.placeClusters)
+              ..where((table) => table.id.equals(clusterId)))
+            .write(PlaceClustersCompanion(labelId: Value(labelId)));
     if (updated != 1) throw StateError('Cluster $clusterId was not found');
   }
 
   @override
   Future<void> setClusterExcluded(int clusterId, bool excluded) async {
-    final updated = await (_db.update(_db.placeClusters)
-          ..where((table) => table.id.equals(clusterId)))
-        .write(PlaceClustersCompanion(excluded: Value(excluded)));
+    final updated =
+        await (_db.update(_db.placeClusters)
+              ..where((table) => table.id.equals(clusterId)))
+            .write(PlaceClustersCompanion(excluded: Value(excluded)));
     if (updated != 1) throw StateError('Cluster $clusterId was not found');
   }
 
@@ -254,9 +259,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   @override
   Future<void> updateLabel(StoredLabel label) async {
     if (label.id <= 0) throw ArgumentError.value(label.id, 'label.id');
-    final updated = await (_db.update(_db.placeLabels)
-          ..where((table) => table.id.equals(label.id)))
-        .write(_labelUpdateCompanion(label));
+    final updated =
+        await (_db.update(_db.placeLabels)
+              ..where((table) => table.id.equals(label.id)))
+            .write(_labelUpdateCompanion(label));
     if (updated != 1) {
       throw StateError('Expected to update one label row, updated $updated');
     }
@@ -268,9 +274,9 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<StoredLabel?> labelById(int id) async {
-    final rows = await (_db.select(_db.placeLabels)
-          ..where((table) => table.id.equals(id)))
-        .get();
+    final rows = await (_db.select(
+      _db.placeLabels,
+    )..where((table) => table.id.equals(id))).get();
     return rows.isEmpty ? null : _labelToDomain(rows.first);
   }
 
@@ -301,22 +307,23 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     String startDate,
     String endDate,
   ) async {
-    final rows = await (_db.select(_db.dailySummaries)
-          ..where(
-            (table) =>
-                table.localDate.isBiggerOrEqualValue(startDate) &
-                table.localDate.isSmallerOrEqualValue(endDate),
-          )
-          ..orderBy([(table) => OrderingTerm.asc(table.localDate)]))
-        .get();
+    final rows =
+        await (_db.select(_db.dailySummaries)
+              ..where(
+                (table) =>
+                    table.localDate.isBiggerOrEqualValue(startDate) &
+                    table.localDate.isSmallerOrEqualValue(endDate),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.localDate)]))
+            .get();
     return rows.map(_dailyToDomain).toList();
   }
 
   @override
   Future<MonthlySummaryRecord?> monthlySummary(String yearMonth) async {
-    final rows = await (_db.select(_db.monthlySummaries)
-          ..where((table) => table.yearMonth.equals(yearMonth)))
-        .get();
+    final rows = await (_db.select(
+      _db.monthlySummaries,
+    )..where((table) => table.yearMonth.equals(yearMonth))).get();
     return rows.isEmpty ? null : _monthlyToDomain(rows.first);
   }
 
@@ -332,10 +339,12 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       await (_db.delete(_db.dailySummaries)
             ..where((table) => table.localDate.isBiggerOrEqualValue(startDate)))
           .go();
-      final month = startDate.length >= 7 ? startDate.substring(0, 7) : startDate;
-      await (_db.delete(_db.monthlySummaries)
-            ..where((table) => table.yearMonth.isBiggerOrEqualValue(month)))
-          .go();
+      final month = startDate.length >= 7
+          ? startDate.substring(0, 7)
+          : startDate;
+      await (_db.delete(
+        _db.monthlySummaries,
+      )..where((table) => table.yearMonth.isBiggerOrEqualValue(month))).go();
     });
   }
 
@@ -345,9 +354,9 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     List<StoredInsight> insights,
   ) {
     return _db.transaction(() async {
-      await (_db.delete(_db.insights)
-            ..where((table) => table.periodKey.equals(periodKey)))
-          .go();
+      await (_db.delete(
+        _db.insights,
+      )..where((table) => table.periodKey.equals(periodKey))).go();
       if (insights.isNotEmpty) {
         await _db.batch((batch) {
           batch.insertAll(_db.insights, insights.map(_insightToDb).toList());
@@ -358,18 +367,19 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<List<StoredInsight>> insightsForPeriod(String periodKey) async {
-    final rows = await (_db.select(_db.insights)
-          ..where((table) => table.periodKey.equals(periodKey))
-          ..orderBy([(table) => OrderingTerm.asc(table.id)]))
-        .get();
+    final rows =
+        await (_db.select(_db.insights)
+              ..where((table) => table.periodKey.equals(periodKey))
+              ..orderBy([(table) => OrderingTerm.asc(table.id)]))
+            .get();
     return rows.map(_insightToDomain).toList();
   }
 
   @override
   Future<AppSettingRecord?> getSetting(String key) async {
-    final rows = await (_db.select(_db.appSettings)
-          ..where((table) => table.key.equals(key)))
-        .get();
+    final rows = await (_db.select(
+      _db.appSettings,
+    )..where((table) => table.key.equals(key))).get();
     if (rows.isEmpty) return null;
     final row = rows.first;
     return AppSettingRecord(
@@ -380,14 +390,15 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   }
 
   @override
-  Future<void> setSetting(String key, String value) =>
-      _db.into(_db.appSettings).insertOnConflictUpdate(
-            AppSettingsCompanion.insert(
-              key: key,
-              value: value,
-              updatedAt: DateTime.now(),
-            ),
-          );
+  Future<void> setSetting(String key, String value) => _db
+      .into(_db.appSettings)
+      .insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: key,
+          value: value,
+          updatedAt: DateTime.now(),
+        ),
+      );
 
   @override
   Future<void> deleteAllUserData() {
@@ -448,29 +459,29 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   VisitsCompanion _visitToDb(StoredVisit visit) => VisitsCompanion.insert(
-        sourceKey: visit.sourceKey,
-        startAtUtc: visit.startAtUtc,
-        endAtUtc: visit.endAtUtc,
-        latE7: visit.latE7,
-        lngE7: visit.lngE7,
-        accuracyM: Value(visit.accuracyM),
-        sourceLabel: Value(visit.sourceLabel),
-        clusterId: Value(visit.clusterId),
-        confidence: Value(visit.confidence),
-      );
+    sourceKey: visit.sourceKey,
+    startAtUtc: visit.startAtUtc,
+    endAtUtc: visit.endAtUtc,
+    latE7: visit.latE7,
+    lngE7: visit.lngE7,
+    accuracyM: Value(visit.accuracyM),
+    sourceLabel: Value(visit.sourceLabel),
+    clusterId: Value(visit.clusterId),
+    confidence: Value(visit.confidence),
+  );
 
   StoredVisit _visitToDomain(VisitRow row) => StoredVisit(
-        id: row.id,
-        sourceKey: row.sourceKey,
-        startAtUtc: row.startAtUtc,
-        endAtUtc: row.endAtUtc,
-        latE7: row.latE7,
-        lngE7: row.lngE7,
-        accuracyM: row.accuracyM,
-        sourceLabel: row.sourceLabel,
-        clusterId: row.clusterId,
-        confidence: row.confidence,
-      );
+    id: row.id,
+    sourceKey: row.sourceKey,
+    startAtUtc: row.startAtUtc,
+    endAtUtc: row.endAtUtc,
+    latE7: row.latE7,
+    lngE7: row.lngE7,
+    accuracyM: row.accuracyM,
+    sourceLabel: row.sourceLabel,
+    clusterId: row.clusterId,
+    confidence: row.confidence,
+  );
 
   MovementsCompanion _movementToDb(StoredMovement movement) =>
       MovementsCompanion.insert(
@@ -490,23 +501,23 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   StoredMovement _movementToDomain(MovementRow row) => StoredMovement(
-        id: row.id,
-        sourceKey: row.sourceKey,
-        startAtUtc: row.startAtUtc,
-        endAtUtc: row.endAtUtc,
-        distanceM: row.distanceM,
-        distanceMethod: DistanceMethod.fromDb(row.distanceMethod),
-        activityType: row.activityType,
-        confidence: row.confidence,
-        startLatLng: row.startLatE7 != null && row.startLngE7 != null
-            ? LatLngE7(row.startLatE7!, row.startLngE7!)
-            : null,
-        endLatLng: row.endLatE7 != null && row.endLngE7 != null
-            ? LatLngE7(row.endLatE7!, row.endLngE7!)
-            : null,
-        path: _decodePath(row.pathJson),
-        validDistance: row.validDistance,
-      );
+    id: row.id,
+    sourceKey: row.sourceKey,
+    startAtUtc: row.startAtUtc,
+    endAtUtc: row.endAtUtc,
+    distanceM: row.distanceM,
+    distanceMethod: DistanceMethod.fromDb(row.distanceMethod),
+    activityType: row.activityType,
+    confidence: row.confidence,
+    startLatLng: row.startLatE7 != null && row.startLngE7 != null
+        ? LatLngE7(row.startLatE7!, row.startLngE7!)
+        : null,
+    endLatLng: row.endLatE7 != null && row.endLngE7 != null
+        ? LatLngE7(row.endLatE7!, row.endLngE7!)
+        : null,
+    path: _decodePath(row.pathJson),
+    validDistance: row.validDistance,
+  );
 
   PlaceClustersCompanion _clusterToDb(StoredCluster cluster) =>
       PlaceClustersCompanion.insert(
@@ -525,23 +536,22 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   StoredCluster _clusterToDomain(
     PlaceClusterRow cluster, {
     PlaceLabelRow? label,
-  }) =>
-      StoredCluster(
-        id: cluster.id,
-        stableKey: cluster.stableKey,
-        centroidLatE7: cluster.centroidLatE7,
-        centroidLngE7: cluster.centroidLngE7,
-        radiusM: cluster.radiusM,
-        visitCount: cluster.visitCount,
-        dwellSeconds: cluster.dwellSeconds,
-        firstAt: cluster.firstAt,
-        lastAt: cluster.lastAt,
-        labelId: cluster.labelId,
-        excluded: cluster.excluded,
-        labelName: label?.displayName,
-        category: label?.category,
-        isBasePlace: label?.isBasePlace ?? false,
-      );
+  }) => StoredCluster(
+    id: cluster.id,
+    stableKey: cluster.stableKey,
+    centroidLatE7: cluster.centroidLatE7,
+    centroidLngE7: cluster.centroidLngE7,
+    radiusM: cluster.radiusM,
+    visitCount: cluster.visitCount,
+    dwellSeconds: cluster.dwellSeconds,
+    firstAt: cluster.firstAt,
+    lastAt: cluster.lastAt,
+    labelId: cluster.labelId,
+    excluded: cluster.excluded,
+    labelName: label?.displayName,
+    category: label?.category,
+    isBasePlace: label?.isBasePlace ?? false,
+  );
 
   PlaceLabelsCompanion _labelInsertCompanion(StoredLabel label) =>
       PlaceLabelsCompanion.insert(
@@ -562,13 +572,13 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   StoredLabel _labelToDomain(PlaceLabelRow row) => StoredLabel(
-        id: row.id,
-        displayName: row.displayName,
-        category: row.category,
-        isBasePlace: row.isBasePlace,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-      );
+    id: row.id,
+    displayName: row.displayName,
+    category: row.category,
+    isBasePlace: row.isBasePlace,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  );
 
   DailySummariesCompanion _dailyToDb(DailySummaryRecord summary) =>
       DailySummariesCompanion.insert(
@@ -584,14 +594,14 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   DailySummaryRecord _dailyToDomain(DailySummaryRow row) => DailySummaryData(
-        localDate: row.localDate,
-        outingFlag: row.outingFlag,
-        visitCount: row.visitCount,
-        clusterCount: row.clusterCount,
-        distanceM: row.distanceM,
-        firstAt: row.firstAt,
-        lastAt: row.lastAt,
-      );
+    localDate: row.localDate,
+    outingFlag: row.outingFlag,
+    visitCount: row.visitCount,
+    clusterCount: row.clusterCount,
+    distanceM: row.distanceM,
+    firstAt: row.firstAt,
+    lastAt: row.lastAt,
+  );
 
   MonthlySummariesCompanion _monthlyToDb(MonthlySummaryRecord summary) =>
       MonthlySummariesCompanion.insert(
@@ -617,10 +627,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         clusterIds: row.clusterIdsJson.isEmpty
             ? const {}
             : row.clusterIdsJson
-                .split(',')
-                .where((value) => value.isNotEmpty)
-                .map(int.parse)
-                .toSet(),
+                  .split(',')
+                  .where((value) => value.isNotEmpty)
+                  .map(int.parse)
+                  .toSet(),
       );
 
   InsightsCompanion _insightToDb(StoredInsight insight) =>
@@ -636,16 +646,16 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   StoredInsight _insightToDomain(InsightRow row) => StoredInsight(
-        id: row.id,
-        periodKey: row.periodKey,
-        ruleId: row.ruleId,
-        severity: row.severity,
-        title: row.title,
-        body: row.body,
-        metricJson: row.metricJson,
-        createdAt: row.createdAt,
-        dismissed: row.dismissed,
-      );
+    id: row.id,
+    periodKey: row.periodKey,
+    ruleId: row.ruleId,
+    severity: row.severity,
+    title: row.title,
+    body: row.body,
+    metricJson: row.metricJson,
+    createdAt: row.createdAt,
+    dismissed: row.dismissed,
+  );
 
   String _encodePath(List<LatLngE7> path) =>
       path.map((point) => '${point.latE7},${point.lngE7}').join(';');

@@ -20,21 +20,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _OnboardingPageData(
       icon: Icons.security,
       title: '端末内だけで処理されます',
-      body: '取り込んだ位置履歴は、この端末の中だけで分析されます。\n'
+      body:
+          '取り込んだ位置履歴は、この端末の中だけで分析されます。\n'
           'アプリはインターネットへ接続しないため、\n'
           'データが外部へ送信されることはありません。',
     ),
     _OnboardingPageData(
       icon: Icons.upload_file,
       title: '手動で書き出した JSON を使います',
-      body: 'Google マップのタイムラインから書き出した\n'
+      body:
+          'Google マップのタイムラインから書き出した\n'
           '「Records.json」をアプリに渡してください。\n'
           '書き出し方法は、アプリ内の案内から確認できます。',
     ),
     _OnboardingPageData(
       icon: Icons.delete_outline,
       title: 'いつでもデータを削除できます',
-      body: '設定からすべてのアプリ内データを削除できます。\n'
+      body:
+          '設定からすべてのアプリ内データを削除できます。\n'
           '削除はオフラインで完了します。',
     ),
   ];
@@ -64,13 +67,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(p.icon, size: 96, color: theme.colorScheme.primary),
+                        Icon(
+                          p.icon,
+                          size: 96,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(height: 32),
                         Text(
                           p.title,
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(
@@ -109,9 +117,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 child: FilledButton(
                   onPressed: _page < _pages.length - 1
                       ? () => _controller.nextPage(
-                            duration: const Duration(milliseconds: 250),
-                            curve: Curves.easeOut,
-                          )
+                          duration: const Duration(milliseconds: 250),
+                          curve: Curves.easeOut,
+                        )
                       : () async {
                           await ref
                               .read(settingsUseCaseProvider)

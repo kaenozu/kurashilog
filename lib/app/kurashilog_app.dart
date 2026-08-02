@@ -63,9 +63,9 @@ class _RootGateState extends ConsumerState<_RootGate>
       final notifier = ref.read(importFlowProvider.notifier);
       final opened = await notifier.startFromShare();
       if (opened && mounted) {
-        await Navigator.of(context).push(MaterialPageRoute(
-          builder: (_) => const ImportFlowScreen(),
-        ));
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ImportFlowScreen()));
       }
     } finally {
       _checkingShare = false;
@@ -81,9 +81,8 @@ class _RootGateState extends ConsumerState<_RootGate>
     }
 
     return done.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => const Scaffold(body: SizedBox()),
       data: (isDone) => isDone ? const MainShell() : const OnboardingScreen(),
     );

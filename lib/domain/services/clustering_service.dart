@@ -126,10 +126,7 @@ class ClusteringService {
 
     var radiusM = 0.0;
     for (final aggregate in group) {
-      radiusM = math.max(
-        radiusM,
-        _metersBetween(centroid, aggregate.centroid),
-      );
+      radiusM = math.max(radiusM, _metersBetween(centroid, aggregate.centroid));
     }
     radiusM += (cellSizeM * math.sqrt2) / 2;
 
@@ -153,7 +150,8 @@ class ClusteringService {
         .toDouble();
     final latitudeRadians = latitude * math.pi / 180;
     final x = coordinate.lng * wgs84SemiMajorAxis * math.pi / 180;
-    final y = wgs84SemiMajorAxis *
+    final y =
+        wgs84SemiMajorAxis *
         math.log(math.tan(math.pi / 4 + latitudeRadians / 2));
     return (x, y);
   }
@@ -163,13 +161,10 @@ class ClusteringService {
     final deltaLng = (b.lng - a.lng) * math.pi / 180;
     final lat1 = a.lat * math.pi / 180;
     final lat2 = b.lat * math.pi / 180;
-    final h = math.pow(math.sin(deltaLat / 2), 2) +
-        math.cos(lat1) *
-            math.cos(lat2) *
-            math.pow(math.sin(deltaLng / 2), 2);
-    return 2 *
-        wgs84SemiMajorAxis *
-        math.asin(math.sqrt(h.clamp(0.0, 1.0)));
+    final h =
+        math.pow(math.sin(deltaLat / 2), 2) +
+        math.cos(lat1) * math.cos(lat2) * math.pow(math.sin(deltaLng / 2), 2);
+    return 2 * wgs84SemiMajorAxis * math.asin(math.sqrt(h.clamp(0.0, 1.0)));
   }
 }
 
@@ -182,9 +177,9 @@ class _CellAgg {
   DateTime? _lastAt;
 
   LatLngE7 get centroid => LatLngE7(
-        (_latitudeSum / visitCount * 1e7).round(),
-        (_longitudeSum / visitCount * 1e7).round(),
-      );
+    (_latitudeSum / visitCount * 1e7).round(),
+    (_longitudeSum / visitCount * 1e7).round(),
+  );
 
   DateTime get firstAt => _firstAt!;
   DateTime get lastAt => _lastAt!;

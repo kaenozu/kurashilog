@@ -26,8 +26,11 @@ ComparisonWindow computeComparisonWindow(
   DateTime latestLocal, {
   int days = 30,
 }) {
-  final end = DateTime(latestLocal.year, latestLocal.month, latestLocal.day)
-      .add(const Duration(days: 1));
+  final end = DateTime(
+    latestLocal.year,
+    latestLocal.month,
+    latestLocal.day,
+  ).add(const Duration(days: 1));
   final currentStart = end.subtract(Duration(days: days));
   final previousStart = currentStart.subtract(Duration(days: days));
   return ComparisonWindow(

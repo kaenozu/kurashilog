@@ -6,8 +6,10 @@ import 'package:kurashilog/infrastructure/parsers/records_parser.dart';
 import 'package:kurashilog/infrastructure/parsers/timeline_parser.dart';
 
 void main() {
-  test('same placeId at different times produces distinct visit keys', () async {
-    const json = '''
+  test(
+    'same placeId at different times produces distinct visit keys',
+    () async {
+      const json = '''
 {
   "semanticSegments": [
     {
@@ -36,17 +38,15 @@ void main() {
 }
 ''';
 
-    final records = await const RecordsTimelineParser()
-        .parse(
-          Stream.value(utf8.encode(json)),
-          CancellationToken(),
-        )
-        .toList();
-    final visits = records.whereType<NormalizedVisit>().toList();
+      final records = await const RecordsTimelineParser()
+          .parse(Stream.value(utf8.encode(json)), CancellationToken())
+          .toList();
+      final visits = records.whereType<NormalizedVisit>().toList();
 
-    expect(visits, hasLength(2));
-    expect(visits[0].sourceKey, isNot(visits[1].sourceKey));
-  });
+      expect(visits, hasLength(2));
+      expect(visits[0].sourceKey, isNot(visits[1].sourceKey));
+    },
+  );
 
   test('preview reports malformed JSON as an error', () async {
     final preview = await const RecordsTimelineParser().preview(

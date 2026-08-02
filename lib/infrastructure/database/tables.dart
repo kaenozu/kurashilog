@@ -10,7 +10,8 @@ class TimelineImports extends Table {
   DateTimeColumn get completedAt => dateTime().nullable()();
   DateTimeColumn get sourceMinAt => dateTime().nullable()();
   DateTimeColumn get sourceMaxAt => dateTime().nullable()();
-  TextColumn get status => text()(); // processing | completed | failed | cancelled
+  TextColumn get status =>
+      text()(); // processing | completed | failed | cancelled
   IntColumn get warningCount => integer().withDefault(const Constant(0))();
   IntColumn get addedVisits => integer().withDefault(const Constant(0))();
   IntColumn get addedMovements => integer().withDefault(const Constant(0))();
@@ -54,8 +55,7 @@ class Movements extends Table {
   TextColumn get pathJson => text().nullable()();
 
   /// 日常移動集計から除外するか（異常速度など）。
-  BoolColumn get validDistance =>
-      boolean().withDefault(const Constant(true))();
+  BoolColumn get validDistance => boolean().withDefault(const Constant(true))();
 }
 
 /// 頻出地点クラスタ（設計書 4.1 place_clusters）。
@@ -138,8 +138,8 @@ class Insights extends Table {
 
   @override
   Set<Set<Column>> get uniqueKeys => {
-        {periodKey, ruleId},
-      };
+    {periodKey, ruleId},
+  };
 }
 
 /// アプリ設定（設計書 4.1 app_settings）。

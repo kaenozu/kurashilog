@@ -58,10 +58,7 @@ class SettingsScreen extends ConsumerWidget {
                           value: DistanceUnit.km,
                           label: Text('km'),
                         ),
-                        ButtonSegment(
-                          value: DistanceUnit.m,
-                          label: Text('m'),
-                        ),
+                        ButtonSegment(value: DistanceUnit.m, label: Text('m')),
                       ],
                       selected: {s.distanceUnit},
                       onSelectionChanged: (v) async {
@@ -84,9 +81,11 @@ class SettingsScreen extends ConsumerWidget {
                     title: const Text('データを再取り込み'),
                     subtitle: const Text('新しいタイムライン JSON を追加します'),
                     onTap: () {
-                      Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const ImportFlowScreen(),
-                      ));
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ImportFlowScreen(),
+                        ),
+                      );
                     },
                   ),
                   const Divider(height: 1),
@@ -126,9 +125,11 @@ class SettingsScreen extends ConsumerWidget {
                 onTap: () async {
                   await ref.read(settingsUseCaseProvider).resetOnboarding();
                   if (context.mounted) {
-                    Navigator.of(context).pushReplacement(MaterialPageRoute(
-                      builder: (_) => const _OnboardingRedirect(),
-                    ));
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => const _OnboardingRedirect(),
+                      ),
+                    );
                   }
                 },
               ),
@@ -168,9 +169,9 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(dataManagementUseCaseProvider).deleteAllUserData();
     ref.read(dashboardRefreshProvider.notifier).state++;
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('すべてのデータを削除しました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('すべてのデータを削除しました')));
     }
   }
 }
@@ -186,17 +187,16 @@ class _OnboardingRedirect extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final done = ref.watch(_onboardingDoneProvider);
     return done.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => const Scaffold(body: SizedBox()),
       data: (done) {
         if (!done) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!context.mounted) return;
-            Navigator.of(context).pushReplacement(MaterialPageRoute(
-              builder: (_) => const OnboardingScreen(),
-            ));
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+            );
           });
         }
         return const Scaffold(body: SizedBox());

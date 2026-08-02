@@ -6,14 +6,7 @@ import '../../infrastructure/parsers/timeline_parser.dart';
 import '../../infrastructure/platform/app_platform.dart';
 
 /// インポートフローのフェーズ。
-enum ImportPhase {
-  idle,
-  previewing,
-  previewReady,
-  importing,
-  done,
-  error,
-}
+enum ImportPhase { idle, previewing, previewReady, importing, done, error }
 
 class ImportFlowState {
   const ImportFlowState({
@@ -45,16 +38,15 @@ class ImportFlowState {
     String? errorCode,
     String? errorMessage,
     bool clearPath = false,
-  }) =>
-      ImportFlowState(
-        phase: phase ?? this.phase,
-        cachePath: clearPath ? null : (cachePath ?? this.cachePath),
-        preview: preview ?? this.preview,
-        progress: progress ?? this.progress,
-        result: result ?? this.result,
-        errorCode: errorCode ?? this.errorCode,
-        errorMessage: errorMessage ?? this.errorMessage,
-      );
+  }) => ImportFlowState(
+    phase: phase ?? this.phase,
+    cachePath: clearPath ? null : (cachePath ?? this.cachePath),
+    preview: preview ?? this.preview,
+    progress: progress ?? this.progress,
+    result: result ?? this.result,
+    errorCode: errorCode ?? this.errorCode,
+    errorMessage: errorMessage ?? this.errorMessage,
+  );
 }
 
 /// インポートフローの状態管理（設計書 M01 TimelineImport）。
@@ -126,10 +118,7 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
       token: _token,
       onProgress: (p) {
         if (!mounted) return;
-        state = state.copyWith(
-          progress: p,
-          phase: ImportPhase.importing,
-        );
+        state = state.copyWith(progress: p, phase: ImportPhase.importing);
       },
     );
     if (!mounted) return;
@@ -174,5 +163,5 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
 
 final importFlowProvider =
     NotifierProvider<ImportFlowNotifier, ImportFlowState>(
-  ImportFlowNotifier.new,
-);
+      ImportFlowNotifier.new,
+    );

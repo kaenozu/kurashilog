@@ -41,6 +41,5 @@ class SourceKeyGenerator {
     return _hash(input);
   }
 
-  String _hash(String input) =>
-      sha256.convert(utf8.encode(input)).toString();
+  String _hash(String input) => sha256.convert(utf8.encode(input)).toString();
 }

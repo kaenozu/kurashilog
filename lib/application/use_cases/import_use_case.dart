@@ -165,13 +165,15 @@ class ImportUseCase {
     final startedAt = DateTime.now();
     final int importId;
     try {
-      importId = await repository.insertImport(ImportedFileRecord(
-        id: 0,
-        fileHash: fileHash,
-        schemaType: parser.schemaType,
-        startedAt: startedAt,
-        status: 'processing',
-      ));
+      importId = await repository.insertImport(
+        ImportedFileRecord(
+          id: 0,
+          fileHash: fileHash,
+          schemaType: parser.schemaType,
+          startedAt: startedAt,
+          status: 'processing',
+        ),
+      );
     } catch (_) {
       return const ImportResult(
         ok: false,
@@ -184,7 +186,9 @@ class ImportUseCase {
       onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 10));
       final records = parser.parse(file.openRead(), cancellation);
       final validated = await validator.validate(records, cancellation);
-      onProgress?.call(const ImportProgress(ImportStage.validating, percent: 40));
+      onProgress?.call(
+        const ImportProgress(ImportStage.validating, percent: 40),
+      );
 
       if (cancellation.isCancelled) {
         await _recordTerminalState(
@@ -226,19 +230,21 @@ class ImportUseCase {
         onProgress?.call(
           const ImportProgress(ImportStage.insights, percent: 95),
         );
-        await repository.updateImport(ImportedFileRecord(
-          id: importId,
-          fileHash: fileHash,
-          schemaType: parser.schemaType,
-          startedAt: startedAt,
-          completedAt: DateTime.now(),
-          sourceMinAt: sourceMinAt,
-          sourceMaxAt: sourceMaxAt,
-          status: 'completed',
-          warningCount: validated.warnings.length,
-          addedVisits: diff.addedVisits,
-          addedMovements: diff.addedMovements,
-        ));
+        await repository.updateImport(
+          ImportedFileRecord(
+            id: importId,
+            fileHash: fileHash,
+            schemaType: parser.schemaType,
+            startedAt: startedAt,
+            completedAt: DateTime.now(),
+            sourceMinAt: sourceMinAt,
+            sourceMaxAt: sourceMaxAt,
+            status: 'completed',
+            warningCount: validated.warnings.length,
+            addedVisits: diff.addedVisits,
+            addedMovements: diff.addedMovements,
+          ),
+        );
       });
 
       onProgress?.call(
@@ -299,15 +305,17 @@ class ImportUseCase {
     int warningCount = 0,
   }) async {
     try {
-      await repository.updateImport(ImportedFileRecord(
-        id: importId,
-        fileHash: fileHash,
-        schemaType: parser.schemaType,
-        startedAt: startedAt,
-        completedAt: DateTime.now(),
-        status: status,
-        warningCount: warningCount,
-      ));
+      await repository.updateImport(
+        ImportedFileRecord(
+          id: importId,
+          fileHash: fileHash,
+          schemaType: parser.schemaType,
+          startedAt: startedAt,
+          completedAt: DateTime.now(),
+          status: status,
+          warningCount: warningCount,
+        ),
+      );
     } catch (_) {
       // 元の失敗理由を優先する。processing 行は次回起動時の復旧対象にできる。
     }
@@ -327,10 +335,7 @@ class ImportUseCase {
     return minimum;
   }
 
-  DateTime? _maxEnd(
-    List<StoredVisit> visits,
-    List<StoredMovement> movements,
-  ) {
+  DateTime? _maxEnd(List<StoredVisit> visits, List<StoredMovement> movements) {
     DateTime? maximum;
     for (final value in <DateTime>[
       ...visits.map((visit) => visit.endAtUtc),
@@ -342,12 +347,12 @@ class ImportUseCase {
   }
 
   ImportPreview _previewError(String code, String message) => ImportPreview(
-        ok: false,
-        fileHash: '',
-        schemaType: 'unknown',
-        errorCode: code,
-        errorMessage: message,
-      );
+    ok: false,
+    fileHash: '',
+    schemaType: 'unknown',
+    errorCode: code,
+    errorMessage: message,
+  );
 
   Future<String> _hashFile(File file) async {
     final hash = DigestSha256();

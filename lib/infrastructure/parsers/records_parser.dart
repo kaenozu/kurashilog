@@ -66,8 +66,7 @@ class RecordsTimelineParser implements TimelineParser {
         legacyPoints.add(point);
         mergeRange(point.at, point.at);
       },
-      onUnsupportedSegment: () =>
-          warn('PAR-001', '未対応のセグメントを無視しました'),
+      onUnsupportedSegment: () => warn('PAR-001', '未対応のセグメントを無視しました'),
       onError: (code, message) {
         parseError ??= ImportParseException(code, message);
       },
@@ -271,10 +270,12 @@ class RecordsTimelineParser implements TimelineParser {
   }
 
   (DateTime?, DateTime?) _segmentRange(Map<String, Object?> segment) {
-    final start = _timestamp(segment['start']) ??
+    final start =
+        _timestamp(segment['start']) ??
         _timestamp(segment['startTime']) ??
         _timestamp(segment['startTimestamp']);
-    final end = _timestamp(segment['end']) ??
+    final end =
+        _timestamp(segment['end']) ??
         _timestamp(segment['endTime']) ??
         _timestamp(segment['endTimestamp']);
     if (start != null || end != null) return (start, end);
@@ -297,14 +298,14 @@ class RecordsTimelineParser implements TimelineParser {
     DateTime end,
   ) {
     final candidate = visit['topCandidate'];
-    final candidateMap =
-        candidate is Map<String, Object?> ? candidate : null;
+    final candidateMap = candidate is Map<String, Object?> ? candidate : null;
     final coordinate = _coordinateFrom(_visitLocation(visit));
     if (coordinate == null) return null;
 
     final placeId = candidateMap?['placeId'];
     final semanticType = candidateMap?['semanticType'];
-    final confidence = _number(visit['locationConfidence']) ??
+    final confidence =
+        _number(visit['locationConfidence']) ??
         _number(candidateMap?['probability']);
 
     // placeId は地点の ID であって訪問イベントの ID ではない。
@@ -352,8 +353,7 @@ class RecordsTimelineParser implements TimelineParser {
       method = DistanceMethod.unknown;
     }
 
-    final normalizedActivity =
-        activityType is String ? activityType : null;
+    final normalizedActivity = activityType is String ? activityType : null;
     final startCoordinate = path.isNotEmpty ? path.first : null;
     final endCoordinate = path.isNotEmpty ? path.last : null;
     final key = sourceKeyGenerator.fingerprint(
@@ -468,18 +468,20 @@ class RecordsTimelineParser implements TimelineParser {
           (latitudeSum / count * 1e7).round(),
           (longitudeSum / count * 1e7).round(),
         );
-        visits.add(NormalizedVisit(
-          sourceKey: sourceKeyGenerator.fingerprint(
-            recordType: 'visit',
+        visits.add(
+          NormalizedVisit(
+            sourceKey: sourceKeyGenerator.fingerprint(
+              recordType: 'visit',
+              startAtUtc: start,
+              endAtUtc: end,
+              latE7: centroid.latE7,
+              lngE7: centroid.lngE7,
+            ),
             startAtUtc: start,
             endAtUtc: end,
-            latE7: centroid.latE7,
-            lngE7: centroid.lngE7,
+            latLng: centroid,
           ),
-          startAtUtc: start,
-          endAtUtc: end,
-          latLng: centroid,
-        ));
+        );
       }
       index = cursor == index ? index + 1 : cursor;
     }
@@ -489,24 +491,27 @@ class RecordsTimelineParser implements TimelineParser {
       final from = visits[i];
       final to = visits[i + 1];
       if (to.startAtUtc.isBefore(from.endAtUtc)) continue;
-      final distance =
-          distanceService.haversineMeters(from.latLng, to.latLng).round();
+      final distance = distanceService
+          .haversineMeters(from.latLng, to.latLng)
+          .round();
       if (distance <= 5) continue;
-      records.add(NormalizedMovement(
-        sourceKey: sourceKeyGenerator.fingerprint(
-          recordType: 'movement',
+      records.add(
+        NormalizedMovement(
+          sourceKey: sourceKeyGenerator.fingerprint(
+            recordType: 'movement',
+            startAtUtc: from.endAtUtc,
+            endAtUtc: to.startAtUtc,
+            latE7: from.latLng.latE7,
+            lngE7: from.latLng.lngE7,
+          ),
           startAtUtc: from.endAtUtc,
           endAtUtc: to.startAtUtc,
-          latE7: from.latLng.latE7,
-          lngE7: from.latLng.lngE7,
+          distanceM: distance,
+          distanceMethod: DistanceMethod.estimatedDirect,
+          startLatLng: from.latLng,
+          endLatLng: to.latLng,
         ),
-        startAtUtc: from.endAtUtc,
-        endAtUtc: to.startAtUtc,
-        distanceM: distance,
-        distanceMethod: DistanceMethod.estimatedDirect,
-        startLatLng: from.latLng,
-        endLatLng: to.latLng,
-      ));
+      );
     }
     return records;
   }
@@ -548,8 +553,8 @@ class _LegacyPoint {
     final milliseconds = timestamp is num
         ? timestamp.toInt()
         : timestamp is String
-            ? int.tryParse(timestamp)
-            : null;
+        ? int.tryParse(timestamp)
+        : null;
     if (milliseconds == null || latitude is! num || longitude is! num) {
       return null;
     }

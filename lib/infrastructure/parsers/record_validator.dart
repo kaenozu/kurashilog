@@ -110,7 +110,8 @@ class RecordValidator {
     }
 
     // 異常速度: レコードは保持し、日常移動集計から除外（設計書 6.2）。
-    var validDistance = movement.distanceMethod != DistanceMethod.unknown &&
+    var validDistance =
+        movement.distanceMethod != DistanceMethod.unknown &&
         movement.distanceM != null;
     if (validDistance &&
         distanceService.isAbsurdSpeed(

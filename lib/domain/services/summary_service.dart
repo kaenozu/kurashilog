@@ -25,7 +25,7 @@ class SummaryService {
     // 基準地点未設定時は「記録のある日数」、設定時は基準地点外の訪問・移動が存在する日数。
     final outing = hasBasePlace
         ? includedVisits.any((v) => v.outsideBasePlace) ||
-            movements.any((m) => m.isValidDistance)
+              movements.any((m) => m.isValidDistance)
         : includedVisits.isNotEmpty || movements.any((m) => m.isValidDistance);
 
     var distance = 0;
@@ -89,8 +89,9 @@ class SummaryService {
       }
     }
 
-    final newClusters =
-        clusterIds.where((id) => !previousClusterIds.contains(id)).toSet();
+    final newClusters = clusterIds
+        .where((id) => !previousClusterIds.contains(id))
+        .toSet();
 
     return MonthlySummaryData(
       yearMonth: yearMonth,

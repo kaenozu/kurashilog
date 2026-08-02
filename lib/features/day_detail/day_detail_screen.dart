@@ -37,10 +37,10 @@ class DayDetailScreen extends ConsumerWidget {
   }
 }
 
-final _dayDetailProvider =
-    FutureProvider.autoDispose.family<DayDetailData, String>(
-  (ref, date) => ref.watch(dashboardUseCaseProvider).dayDetail(date),
-);
+final _dayDetailProvider = FutureProvider.autoDispose
+    .family<DayDetailData, String>(
+      (ref, date) => ref.watch(dashboardUseCaseProvider).dayDetail(date),
+    );
 
 class _TimelineBody extends StatelessWidget {
   const _TimelineBody({required this.data});
@@ -84,9 +84,8 @@ class _TimelineBody extends StatelessWidget {
     );
   }
 
-  String _km(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _km(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }
 
 class _TimelineRow extends ConsumerWidget {
@@ -110,9 +109,7 @@ class _TimelineRow extends ConsumerWidget {
     final time =
         '${timeFmt.format(entry.startsAt)}〜${timeFmt.format(entry.endsAt)}';
     final subtitle = isVisit
-        ? (entry.dwellMinutes != null
-            ? '滞在 ${entry.dwellMinutes!} 分'
-            : '訪問')
+        ? (entry.dwellMinutes != null ? '滞在 ${entry.dwellMinutes!} 分' : '訪問')
         : [
             if (entry.distanceM != null) '${_km(entry.distanceM!)}',
             if (entry.activityType != null) _activityLabel(entry.activityType!),
@@ -127,8 +124,11 @@ class _TimelineRow extends ConsumerWidget {
             width: 28,
             child: Column(
               children: [
-                Icon(isVisit ? Icons.place : Icons.directions,
-                    size: 18, color: color),
+                Icon(
+                  isVisit ? Icons.place : Icons.directions,
+                  size: 18,
+                  color: color,
+                ),
                 if (!isLast)
                   Expanded(
                     child: Container(width: 2, color: scheme.outlineVariant),
@@ -150,9 +150,7 @@ class _TimelineRow extends ConsumerWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              isVisit
-                                  ? (entry.placeName ?? '不明な地点')
-                                  : '移動',
+                              isVisit ? (entry.placeName ?? '不明な地点') : '移動',
                               style: theme.textTheme.titleSmall,
                             ),
                           ),
@@ -169,7 +167,8 @@ class _TimelineRow extends ConsumerWidget {
                                 if (!ok && context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                        content: Text('地図アプリが開けませんでした')),
+                                      content: Text('地図アプリが開けませんでした'),
+                                    ),
                                   );
                                 }
                               },
@@ -190,20 +189,19 @@ class _TimelineRow extends ConsumerWidget {
     );
   }
 
-  String _km(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _km(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 
   String _activityLabel(String type) => switch (type) {
-        'IN_PASSENGER_VEHICLE' => '車',
-        'IN_BUS' => 'バス',
-        'IN_TRAIN' => '電車',
-        'ON_FOOT' => '徒歩',
-        'ON_BICYCLE' => '自転車',
-        'IN_FLIGHT' => '飛行機',
-        'STILL' => '停止',
-        _ => '移動',
-      };
+    'IN_PASSENGER_VEHICLE' => '車',
+    'IN_BUS' => 'バス',
+    'IN_TRAIN' => '電車',
+    'ON_FOOT' => '徒歩',
+    'ON_BICYCLE' => '自転車',
+    'IN_FLIGHT' => '飛行機',
+    'STILL' => '停止',
+    _ => '移動',
+  };
 }
 
 String _formatDate(String localDate) {
@@ -211,6 +209,14 @@ String _formatDate(String localDate) {
   final y = int.parse(parts[0]);
   final m = int.parse(parts[1]);
   final d = int.parse(parts[2]);
-  final weekday = ['月', '火', '水', '木', '金', '土', '日'][DateTime(y, m, d).weekday - 1];
+  final weekday = [
+    '月',
+    '火',
+    '水',
+    '木',
+    '金',
+    '土',
+    '日',
+  ][DateTime(y, m, d).weekday - 1];
   return '$y年$m月$d日（$weekday）';
 }

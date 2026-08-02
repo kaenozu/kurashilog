@@ -6,9 +6,7 @@ import '../repositories/kurashilog_repository.dart';
 
 /// データ管理（設計書 FR-110 全削除 / PR-05 / 8.1 削除手順）。
 class DataManagementUseCase {
-  const DataManagementUseCase({
-    required this.repository,
-  });
+  const DataManagementUseCase({required this.repository});
 
   final KurashilogRepository repository;
 

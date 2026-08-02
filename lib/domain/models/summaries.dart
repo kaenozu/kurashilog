@@ -90,15 +90,15 @@ class MonthlySummaryData {
 
   /// 集計対象の月が 1 日も無い場合の空サマリー。
   factory MonthlySummaryData.empty(String yearMonth) => MonthlySummaryData(
-        yearMonth: yearMonth,
-        outingDays: 0,
-        distanceM: 0,
-        uniqueClusters: 0,
-        newClusters: 0,
-        maxDistanceDate: null,
-        calculatedAt: DateTime.now(),
-        clusterIds: const {},
-      );
+    yearMonth: yearMonth,
+    outingDays: 0,
+    distanceM: 0,
+    uniqueClusters: 0,
+    newClusters: 0,
+    maxDistanceDate: null,
+    calculatedAt: DateTime.now(),
+    clusterIds: const {},
+  );
 }
 
 /// メトリクスカードのアイコン種別（ドメインは Flutter に依存しない）。

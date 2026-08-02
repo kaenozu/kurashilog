@@ -15,7 +15,8 @@ class ImportFlowScreen extends ConsumerWidget {
     final state = ref.watch(importFlowProvider);
 
     return PopScope(
-      canPop: state.phase == ImportPhase.idle || state.phase == ImportPhase.done,
+      canPop:
+          state.phase == ImportPhase.idle || state.phase == ImportPhase.done,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
           ref.read(importFlowProvider.notifier).cancel();
@@ -29,43 +30,42 @@ class ImportFlowScreen extends ConsumerWidget {
               : true,
         ),
         body: switch (state.phase) {
-          ImportPhase.idle => _IdleBody(onStart: () {
+          ImportPhase.idle => _IdleBody(
+            onStart: () {
               ref.read(importFlowProvider.notifier).startFromPicker();
-            }),
-          ImportPhase.previewing => const _LoadingBody(
-              label: 'ファイルを確認しています…'),
+            },
+          ),
+          ImportPhase.previewing => const _LoadingBody(label: 'ファイルを確認しています…'),
           ImportPhase.previewReady => _PreviewBody(
-              preview: state.preview!,
-              onCancel: () => ref.read(importFlowProvider.notifier).dismiss(),
-              onImport: () =>
-                  ref.read(importFlowProvider.notifier).startImport(),
-            ),
+            preview: state.preview!,
+            onCancel: () => ref.read(importFlowProvider.notifier).dismiss(),
+            onImport: () => ref.read(importFlowProvider.notifier).startImport(),
+          ),
           ImportPhase.importing => _ImportingBody(
-              progress: state.progress,
-              onCancel: () =>
-                  ref.read(importFlowProvider.notifier).cancel(),
-            ),
+            progress: state.progress,
+            onCancel: () => ref.read(importFlowProvider.notifier).cancel(),
+          ),
           ImportPhase.done => _ResultBody(
-              result: state.result!,
-              onClose: () async {
-                await ref.read(importFlowProvider.notifier).dismiss();
-                if (context.mounted) Navigator.of(context).pop();
-              },
-            ),
+            result: state.result!,
+            onClose: () async {
+              await ref.read(importFlowProvider.notifier).dismiss();
+              if (context.mounted) Navigator.of(context).pop();
+            },
+          ),
           ImportPhase.error => _ErrorBody(
-              code: state.errorCode,
-              message: state.errorMessage,
-              onRetry: () {
-                final path = state.cachePath;
-                if (path != null) {
-                  ref.read(importFlowProvider.notifier).preview(path);
-                }
-              },
-              onClose: () async {
-                await ref.read(importFlowProvider.notifier).dismiss();
-                if (context.mounted) Navigator.of(context).pop();
-              },
-            ),
+            code: state.errorCode,
+            message: state.errorMessage,
+            onRetry: () {
+              final path = state.cachePath;
+              if (path != null) {
+                ref.read(importFlowProvider.notifier).preview(path);
+              }
+            },
+            onClose: () async {
+              await ref.read(importFlowProvider.notifier).dismiss();
+              if (context.mounted) Navigator.of(context).pop();
+            },
+          ),
         },
       ),
     );
@@ -85,8 +85,11 @@ class _IdleBody extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Icon(Icons.file_upload_outlined,
-              size: 56, color: Color(0xFF2E6B4F)),
+          const Icon(
+            Icons.file_upload_outlined,
+            size: 56,
+            color: Color(0xFF2E6B4F),
+          ),
           const SizedBox(height: 16),
           Text(
             '書き出したタイムライン JSON を選んでください',
@@ -164,18 +167,27 @@ class _PreviewBody extends StatelessWidget {
                 _row(theme, '形式', 'タイムライン（Records.json）'),
                 _row(theme, '対象期間', period),
                 _row(theme, '概算レコード数', '${preview.recordCount} 件'),
-                _row(theme, 'ファイルサイズ',
-                    '${(preview.fileSizeBytes / 1024 / 1024).toStringAsFixed(1)} MB'),
+                _row(
+                  theme,
+                  'ファイルサイズ',
+                  '${(preview.fileSizeBytes / 1024 / 1024).toStringAsFixed(1)} MB',
+                ),
                 if (preview.warnings.isNotEmpty) ...[
                   const Divider(height: 24),
-                  Text('注意',
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: theme.colorScheme.error)),
+                  Text(
+                    '注意',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   for (final w in preview.warnings)
-                    Text('・${w.message}',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
+                    Text(
+                      '・${w.message}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                 ],
               ],
             ),
@@ -187,32 +199,30 @@ class _PreviewBody extends StatelessWidget {
           style: theme.textTheme.bodySmall,
         ),
         const SizedBox(height: 24),
-        FilledButton(
-          onPressed: onImport,
-          child: const Text('この内容で取り込む'),
-        ),
+        FilledButton(onPressed: onImport, child: const Text('この内容で取り込む')),
         TextButton(onPressed: onCancel, child: const Text('キャンセル')),
       ],
     );
   }
 
   Widget _row(ThemeData theme, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text(label,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            Expanded(
-              child: Text(value, style: theme.textTheme.bodyMedium),
-            ),
-          ],
+          ),
         ),
-      );
+        Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
+      ],
+    ),
+  );
 }
 
 class _ImportingBody extends StatelessWidget {
@@ -306,12 +316,14 @@ class _ResultBody extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('警告',
-                      style: theme.textTheme.labelLarge
-                          ?.copyWith(color: theme.colorScheme.error)),
+                  Text(
+                    '警告',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
                   for (final w in result.warnings)
-                    Text('・${w.message}',
-                        style: theme.textTheme.bodySmall),
+                    Text('・${w.message}', style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
@@ -324,19 +336,22 @@ class _ResultBody extends StatelessWidget {
   }
 
   Widget _row(ThemeData theme, String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 110,
-              child: Text(label,
-                  style: theme.textTheme.bodyMedium
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+    padding: const EdgeInsets.symmetric(vertical: 4),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
-          ],
+          ),
         ),
-      );
+        Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
+      ],
+    ),
+  );
 }
 
 class _ErrorBody extends StatelessWidget {
@@ -379,8 +394,9 @@ class _ErrorBody extends StatelessWidget {
             Text(
               'エラーコード: $code',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           const SizedBox(height: 8),
           Text(

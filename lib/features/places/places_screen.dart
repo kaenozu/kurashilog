@@ -29,10 +29,8 @@ class PlacesScreen extends ConsumerWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: clusters.length,
-            itemBuilder: (context, i) => _PlaceTile(
-              cluster: clusters[i],
-              rank: i + 1,
-            ),
+            itemBuilder: (context, i) =>
+                _PlaceTile(cluster: clusters[i], rank: i + 1),
           );
         },
       ),
@@ -155,16 +153,14 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
                   DropdownMenuItem(value: 'leisure', child: Text('娯楽・買い物')),
                   DropdownMenuItem(value: 'other', child: Text('その他')),
                 ],
-                onChanged: (value) =>
-                    setDialogState(() => category = value),
+                onChanged: (value) => setDialogState(() => category = value),
               ),
               const SizedBox(height: 12),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('基準地点にする（自宅など）'),
                 value: isBasePlace,
-                onChanged: (value) =>
-                    setDialogState(() => isBasePlace = value),
+                onChanged: (value) => setDialogState(() => isBasePlace = value),
               ),
             ],
           ),
@@ -187,7 +183,9 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
     if (save != true || !mounted) return;
 
     await _runBusy(() async {
-      await ref.read(placesUseCaseProvider).saveLabel(
+      await ref
+          .read(placesUseCaseProvider)
+          .saveLabel(
             clusterId: cluster.id,
             displayName: displayName,
             category: category,
@@ -197,10 +195,10 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
   }
 
   Future<void> _toggleExclude(StoredCluster cluster) => _runBusy(() async {
-        await ref
-            .read(placesUseCaseProvider)
-            .setExcluded(cluster.id, !cluster.excluded);
-      });
+    await ref
+        .read(placesUseCaseProvider)
+        .setExcluded(cluster.id, !cluster.excluded);
+  });
 
   Future<void> _runBusy(Future<void> Function() action) async {
     setState(() => _busy = true);
@@ -209,9 +207,9 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
       ref.read(dashboardRefreshProvider.notifier).state++;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('地点の更新に失敗しました')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('地点の更新に失敗しました')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -223,9 +221,9 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
         .read(externalMapOpenerProvider)
         .open(cluster.centroid, label: cluster.displayName);
     if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('地図アプリが開けませんでした')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('地図アプリが開けませんでした')));
     }
   }
 

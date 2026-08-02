@@ -88,8 +88,10 @@ class AnalysisCoordinator {
       var best = stored.first;
       var bestDistance = distance.haversineMeters(visit.latLng, best.centroid);
       for (final cluster in stored.skip(1)) {
-        final candidateDistance =
-            distance.haversineMeters(visit.latLng, cluster.centroid);
+        final candidateDistance = distance.haversineMeters(
+          visit.latLng,
+          cluster.centroid,
+        );
         if (candidateDistance < bestDistance) {
           best = cluster;
           bestDistance = candidateDistance;
@@ -137,14 +139,16 @@ class AnalysisCoordinator {
 
     final labels = await repository.allLabels();
     final clusters = await repository.allClusters();
-    final excludedIds =
-        clusters.where((cluster) => cluster.excluded).map((c) => c.id).toSet();
+    final excludedIds = clusters
+        .where((cluster) => cluster.excluded)
+        .map((c) => c.id)
+        .toSet();
     final baseLabel = labels.where((label) => label.isBasePlace).firstOrNull;
     final baseCluster = baseLabel == null
         ? null
         : clusters
-            .where((cluster) => cluster.labelId == baseLabel.id)
-            .firstOrNull;
+              .where((cluster) => cluster.labelId == baseLabel.id)
+              .firstOrNull;
 
     final visitsByDate = <String, List<StoredVisit>>{};
     for (final visit in visits) {
@@ -172,41 +176,43 @@ class AnalysisCoordinator {
     final recordedDates = <String>{
       ...visitsByDate.keys,
       ...movementsByDate.keys,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
 
     final daily = <DailySummaryData>[];
     for (final date in recordedDates) {
       final dayVisits = visitsByDate[date] ?? const [];
       final dayMovements = movementsByDate[date] ?? const [];
-      daily.add(summaries.computeDaily(
-        localDate: date,
-        visits: dayVisits
-            .map(
-              (visit) => DailyVisitInput(
-                startAtUtc: visit.startAtUtc,
-                endAtUtc: visit.endAtUtc,
-                clusterId: visit.clusterId,
-                excluded: visit.clusterId != null &&
-                    excludedIds.contains(visit.clusterId),
-                outsideBasePlace: baseCluster != null &&
-                    visit.clusterId != baseCluster.id,
-              ),
-            )
-            .toList(),
-        movements: dayMovements
-            .map(
-              (movement) => DailyMovementInput(
-                startAtUtc: movement.startAtUtc,
-                endAtUtc: movement.endAtUtc,
-                distanceM: movement.distanceM ?? 0,
-                isValidDistance:
-                    movement.validDistance && movement.distanceM != null,
-              ),
-            )
-            .toList(),
-        hasBasePlace: baseCluster != null,
-      ));
+      daily.add(
+        summaries.computeDaily(
+          localDate: date,
+          visits: dayVisits
+              .map(
+                (visit) => DailyVisitInput(
+                  startAtUtc: visit.startAtUtc,
+                  endAtUtc: visit.endAtUtc,
+                  clusterId: visit.clusterId,
+                  excluded:
+                      visit.clusterId != null &&
+                      excludedIds.contains(visit.clusterId),
+                  outsideBasePlace:
+                      baseCluster != null && visit.clusterId != baseCluster.id,
+                ),
+              )
+              .toList(),
+          movements: dayMovements
+              .map(
+                (movement) => DailyMovementInput(
+                  startAtUtc: movement.startAtUtc,
+                  endAtUtc: movement.endAtUtc,
+                  distanceM: movement.distanceM ?? 0,
+                  isValidDistance:
+                      movement.validDistance && movement.distanceM != null,
+                ),
+              )
+              .toList(),
+          hasBasePlace: baseCluster != null,
+        ),
+      );
     }
 
     // 古い計算結果を残さない。
@@ -236,10 +242,12 @@ class AnalysisCoordinator {
       previousStart: window.previousStart,
       previousEnd: window.previousEnd,
       quality: freshness
-          .evaluate(FreshnessInput(
-            nowLocalDate: DateTime.now(),
-            latestImportedAt: latest,
-          ))
+          .evaluate(
+            FreshnessInput(
+              nowLocalDate: DateTime.now(),
+              latestImportedAt: latest,
+            ),
+          )
           .quality,
     );
     final selected = insights.selectForMonthStory(context);
@@ -271,10 +279,12 @@ class AnalysisCoordinator {
     final previousStart = DateTime(year, month - 1);
     final latest = await repository.latestActivityAt();
     final quality = freshness
-        .evaluate(FreshnessInput(
-          nowLocalDate: DateTime.now(),
-          latestImportedAt: latest,
-        ))
+        .evaluate(
+          FreshnessInput(
+            nowLocalDate: DateTime.now(),
+            latestImportedAt: latest,
+          ),
+        )
         .quality;
     final context = await _buildInsightContext(
       currentStart: currentStart,
@@ -311,18 +321,22 @@ class AnalysisCoordinator {
     );
 
     final clusters = await repository.allClusters();
-    final excludedIds =
-        clusters.where((cluster) => cluster.excluded).map((c) => c.id).toSet();
+    final excludedIds = clusters
+        .where((cluster) => cluster.excluded)
+        .map((c) => c.id)
+        .toSet();
     final labels = await repository.allLabels();
     final baseLabel = labels.where((label) => label.isBasePlace).firstOrNull;
     final baseCluster = baseLabel == null
         ? null
         : clusters
-            .where((cluster) => cluster.labelId == baseLabel.id)
-            .firstOrNull;
+              .where((cluster) => cluster.labelId == baseLabel.id)
+              .firstOrNull;
 
     int sumDistance(List<StoredMovement> values) => values
-        .where((movement) => movement.validDistance && movement.distanceM != null)
+        .where(
+          (movement) => movement.validDistance && movement.distanceM != null,
+        )
         .fold(0, (sum, movement) => sum + movement.distanceM!);
 
     Map<int, int> clusterCounts(List<StoredVisit> values) {
@@ -365,7 +379,8 @@ class AnalysisCoordinator {
       final distances = <int>[];
       for (final visit in values) {
         final local = visit.startAtUtc.toLocal();
-        final holiday = local.weekday == DateTime.saturday ||
+        final holiday =
+            local.weekday == DateTime.saturday ||
             local.weekday == DateTime.sunday;
         if (!holiday ||
             visit.clusterId == baseCluster.id ||

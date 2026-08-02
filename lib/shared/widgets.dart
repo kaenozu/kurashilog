@@ -14,30 +14,30 @@ class QualityBadge extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final (bg, fg, icon) = switch (quality) {
       DataQuality.high => (
-          scheme.primaryContainer,
-          scheme.onPrimaryContainer,
-          Icons.check_circle_outline,
-        ),
+        scheme.primaryContainer,
+        scheme.onPrimaryContainer,
+        Icons.check_circle_outline,
+      ),
       DataQuality.medium => (
-          scheme.secondaryContainer,
-          scheme.onSecondaryContainer,
-          Icons.info_outline,
-        ),
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
+        Icons.info_outline,
+      ),
       DataQuality.low => (
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-          Icons.update,
-        ),
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+        Icons.update,
+      ),
       DataQuality.quiteLow => (
-          scheme.errorContainer,
-          scheme.onErrorContainer,
-          Icons.warning_amber_rounded,
-        ),
+        scheme.errorContainer,
+        scheme.onErrorContainer,
+        Icons.warning_amber_rounded,
+      ),
       DataQuality.historyOnly => (
-          scheme.surfaceContainerHighest,
-          scheme.onSurfaceVariant,
-          Icons.history,
-        ),
+        scheme.surfaceContainerHighest,
+        scheme.onSurfaceVariant,
+        Icons.history,
+      ),
     };
 
     final label = compact
@@ -58,10 +58,9 @@ class QualityBadge extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .labelMedium
-                  ?.copyWith(color: fg),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: fg),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -106,8 +105,9 @@ class MetricCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     label,
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(color: scheme.onSurfaceVariant),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -117,23 +117,26 @@ class MetricCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               value,
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             if (deltaLabel != null) ...[
               const SizedBox(height: 4),
               Text(
                 deltaLabel!,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: scheme.primary),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.primary,
+                ),
               ),
             ],
             if (note != null) ...[
               const SizedBox(height: 2),
               Text(
                 note!,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: scheme.onSurfaceVariant),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
               ),
             ],
           ],
@@ -174,13 +177,11 @@ class EmptyState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-            if (action != null) ...[
-              const SizedBox(height: 20),
-              action!,
-            ],
+            if (action != null) ...[const SizedBox(height: 20), action!],
           ],
         ),
       ),

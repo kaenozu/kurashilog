@@ -53,7 +53,8 @@ class InsightEngine {
     if (ctx.previousOutingDays == 0) return const [];
 
     final ratio =
-        (ctx.currentOutingDays - ctx.previousOutingDays) / ctx.previousOutingDays;
+        (ctx.currentOutingDays - ctx.previousOutingDays) /
+        ctx.previousOutingDays;
     if (ratio.abs() < 0.20) return const [];
 
     final delta = ctx.currentOutingDays - ctx.previousOutingDays;
@@ -73,7 +74,7 @@ class InsightEngine {
           'previous': ctx.previousOutingDays,
           'current': ctx.currentOutingDays,
         },
-      )
+      ),
     ];
   }
 
@@ -82,13 +83,14 @@ class InsightEngine {
     if (ctx.currentDayCount < 7 || ctx.previousDayCount < 7) return const [];
     if (ctx.previousDistanceM <= 0) return const [];
 
-    final ratio = (ctx.currentDistanceM - ctx.previousDistanceM) /
-        ctx.previousDistanceM;
+    final ratio =
+        (ctx.currentDistanceM - ctx.previousDistanceM) / ctx.previousDistanceM;
     if (ratio.abs() < 0.25) return const [];
 
     final deltaKm = (ctx.currentDistanceM - ctx.previousDistanceM) / 1000;
     final direction = deltaKm > 0 ? '増え' : '減り';
-    final body = '移動量が前期間より${(ratio.abs() * 100).round()}%$directionています'
+    final body =
+        '移動量が前期間より${(ratio.abs() * 100).round()}%$directionています'
         '（${(ctx.previousDistanceM / 1000).toStringAsFixed(0)}km→'
         '${(ctx.currentDistanceM / 1000).toStringAsFixed(0)}km）。';
     return [
@@ -104,7 +106,7 @@ class InsightEngine {
           'previousM': ctx.previousDistanceM,
           'currentM': ctx.currentDistanceM,
         },
-      )
+      ),
     ];
   }
 
@@ -121,7 +123,7 @@ class InsightEngine {
         body: body,
         score: 50 + ctx.newClusterCount,
         metricJson: {'count': ctx.newClusterCount},
-      )
+      ),
     ];
   }
 
@@ -136,7 +138,8 @@ class InsightEngine {
       if (current < previous * 1.5) continue;
       final score = 40 + (current / previous * 100).round();
       final label = ctx.clusterNames[id] ?? '地点${_clusterLabel(id)}';
-      final body = '$label への訪問が増えています'
+      final body =
+          '$label への訪問が増えています'
           '（${previous}回→$current回）。';
       final candidate = InsightData(
         ruleId: 'IN-04',
@@ -161,8 +164,7 @@ class InsightEngine {
     if (diff.abs() < 30) return const [];
 
     final direction = diff > 0 ? '遅く' : '早く';
-    final body =
-        '平日の帰宅が平均${diff.abs()}分$directionなっています。';
+    final body = '平日の帰宅が平均${diff.abs()}分$directionなっています。';
     return [
       InsightData(
         ruleId: 'IN-05',
@@ -172,11 +174,8 @@ class InsightEngine {
         title: '平日の帰宅時間が変わりました',
         body: body,
         score: 55 + diff.abs(),
-        metricJson: {
-          'previousMinutes': previous,
-          'currentMinutes': current,
-        },
-      )
+        metricJson: {'previousMinutes': previous, 'currentMinutes': current},
+      ),
     ];
   }
 
@@ -190,7 +189,8 @@ class InsightEngine {
     if (ratio.abs() < 0.25) return const [];
 
     final direction = ratio > 0 ? '広がり' : '狭まり';
-    final body = '休日の行動範囲が${direction}ました'
+    final body =
+        '休日の行動範囲が${direction}ました'
         '（約${_km(previous)}→約${_km(current)}）。';
     return [
       InsightData(
@@ -201,17 +201,13 @@ class InsightEngine {
         title: '休日の行動範囲が変わりました',
         body: body,
         score: 45 + (ratio.abs() * 100).round(),
-        metricJson: {
-          'previousM': previous,
-          'currentM': current,
-        },
-      )
+        metricJson: {'previousM': previous, 'currentM': current},
+      ),
     ];
   }
 
   String _clusterLabel(int id) => 'B'; // 表示用プレースホルダ（地点名は UI 側で解決）
 
-  String _km(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _km(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }
