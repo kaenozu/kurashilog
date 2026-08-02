@@ -266,6 +266,13 @@ class RecordsTimelineParser implements TimelineParser {
     if (activity is Map<String, Object?>) {
       return _activityToRecord(activity, start, end, segment);
     }
+
+    // 旧形式の activitySegments はセグメント直下に
+    // activityType / distance を持つため、セグメント自身を activity として扱う。
+    final legacyType = segment['activityType'];
+    if (legacyType is String || _number(segment['distance']) != null) {
+      return _activityToRecord(segment, start, end, segment);
+    }
     return null;
   }
 
@@ -329,17 +336,43 @@ class RecordsTimelineParser implements TimelineParser {
     );
   }
 
+  String? _activityTypeFrom(Map<String, Object?> activity) {
+    final direct = activity['activityType'];
+    if (direct is String && direct.isNotEmpty) return direct;
+    if (direct is Map<String, Object?>) {
+      final nested = direct['type'];
+      if (nested is String && nested.isNotEmpty) return nested;
+    }
+    // 現行 Takeout の activity は start に種別（WALKING 等）を持つ。
+    // 旧配列形式の start はタイムスタンプなので種別として扱わない。
+    final start = activity['start'];
+    if (start is String &&
+        start.isNotEmpty &&
+        DateTime.tryParse(start) == null) {
+      return start;
+    }
+    final topCandidate = activity['topCandidate'];
+    if (topCandidate is Map<String, Object?>) {
+      final candidateType = topCandidate['type'];
+      if (candidateType is String && candidateType.isNotEmpty) {
+        return candidateType;
+      }
+    }
+    return null;
+  }
+
   NormalizedMovement _activityToRecord(
     Map<String, Object?> activity,
     DateTime start,
     DateTime end,
     Map<String, Object?> segment,
   ) {
-    final activityType = activity['activityType'];
+    final activityType = _activityTypeFrom(activity);
     var path = _waypoints(activity['waypoints']);
     if (path.isEmpty) path = _timelinePathCoordinates(segment['timelinePath']);
 
-    final recordedDistance = _number(activity['distance']);
+    final recordedDistance =
+        _number(activity['distance']) ?? _number(activity['distanceMeters']);
     final int? distanceM;
     final DistanceMethod method;
     if (recordedDistance != null && recordedDistance > 0) {

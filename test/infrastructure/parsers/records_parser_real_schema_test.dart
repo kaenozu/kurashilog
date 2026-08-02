@@ -28,9 +28,9 @@ void main() {
         final visits = records.whereType<NormalizedVisit>().toList();
         final movements = records.whereType<NormalizedMovement>().toList();
 
-        expect(records, hasLength(8));
+        expect(records, hasLength(9));
         expect(visits, hasLength(6));
-        expect(movements, hasLength(2));
+        expect(movements, hasLength(3));
       },
     );
 
@@ -43,9 +43,16 @@ void main() {
         expect(visit.latLng.isValid, isTrue);
       }
       for (final movement in movements) {
-        expect(movement.distanceMethod, DistanceMethod.estimatedPath);
+        expect(movement.distanceMethod, DistanceMethod.recorded);
         expect(movement.distanceM, isNotNull);
         expect(movement.distanceM, greaterThan(0));
+        expect(movement.activityType, isNotNull);
+      }
+      for (final movement in movements.where(
+        (m) =>
+            m.startAtUtc == DateTime.utc(2026, 7, 7, 2) ||
+            m.startAtUtc == DateTime.utc(2026, 7, 8, 2),
+      )) {
         expect(movement.startLatLng, isNotNull);
         expect(movement.endLatLng, isNotNull);
       }
@@ -127,13 +134,73 @@ void main() {
       final visits = records.whereType<NormalizedVisit>().toList();
       final movements = records.whereType<NormalizedMovement>().toList();
 
-      expect(records, hasLength(8));
+      expect(records, hasLength(9));
       expect(visits, hasLength(6));
-      expect(movements, hasLength(2));
+      expect(movements, hasLength(3));
       expect(
         visits.any((v) => v.startAtUtc == DateTime.utc(2026, 7, 6, 2)),
         isFalse,
       );
+    });
+
+    test(
+      'uses activity.start and distanceMeters from current Takeout',
+      () async {
+        final records = await parseFixture();
+        final movements = records.whereType<NormalizedMovement>().toList();
+
+        final walking = movements.singleWhere(
+          (m) => m.startAtUtc == DateTime.utc(2026, 7, 7, 2),
+        );
+        expect(walking.activityType, 'WALKING');
+        expect(walking.distanceM, 1520);
+        expect(walking.distanceMethod, DistanceMethod.recorded);
+
+        final vehicle = movements.singleWhere(
+          (m) => m.startAtUtc == DateTime.utc(2026, 7, 8, 2),
+        );
+        expect(vehicle.activityType, 'IN_VEHICLE');
+        expect(vehicle.distanceM, 9000);
+        expect(vehicle.distanceMethod, DistanceMethod.recorded);
+      },
+    );
+
+    test('derives movement from legacy activitySegments entries', () async {
+      final records = await parseFixture();
+      final legacyMovement = records
+          .whereType<NormalizedMovement>()
+          .singleWhere((m) => m.startAtUtc == DateTime.utc(2026, 7, 1, 5));
+
+      expect(legacyMovement.activityType, 'WALKING');
+      expect(legacyMovement.distanceM, 800);
+      expect(legacyMovement.distanceMethod, DistanceMethod.recorded);
+      expect(legacyMovement.endAtUtc, DateTime.utc(2026, 7, 1, 5, 30));
+    });
+
+    test('does not treat a timestamp-like activity.start as a type', () async {
+      final bytes = utf8.encode('''
+      {
+        "semanticSegments": [
+          {
+            "startTime": "2026-07-09T02:00:00Z",
+            "endTime": "2026-07-09T03:00:00Z",
+            "activity": {
+              "start": "2026-07-09T02:00:00Z",
+              "topCandidate": {"type": "CYCLING"},
+              "distanceMeters": 2000.0
+            }
+          }
+        ],
+        "locations": [],
+        "activitySegments": []
+      }
+      ''');
+      final records = await parseBytes(bytes);
+
+      final movement = records.single as NormalizedMovement;
+      expect(movement.activityType, 'CYCLING');
+      expect(movement.distanceM, 2000);
+      expect(movement.distanceMethod, DistanceMethod.recorded);
     });
 
     test(
