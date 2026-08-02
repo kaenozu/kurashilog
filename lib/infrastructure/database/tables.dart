@@ -137,9 +137,9 @@ class Insights extends Table {
   BoolColumn get dismissed => boolean().withDefault(const Constant(false))();
 
   @override
-  Set<Set<Column>> get uniqueKeys => {
+  List<Set<Column>> get uniqueKeys => [
     {periodKey, ruleId},
-  };
+  ];
 }
 
 /// アプリ設定（設計書 4.1 app_settings）。
