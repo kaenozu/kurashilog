@@ -1,0 +1,135 @@
+name: Publish PR 1 acceptance APK
+
+on:
+  push:
+    branches:
+      - agent/pr1-acceptance-release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-pr1-acceptance-apk
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      SOURCE_SHA: 15a9cd52b77622c0269e2ce031528561fa292b95
+      SHORT_SHA: 15a9cd5
+      RELEASE_TAG: pr1-acceptance-20260802-15a9cd5
+      RELEASE_TITLE: Kurashilog PR #1 acceptance build (15a9cd5)
+    steps:
+      - name: Check out the exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Restore missing Flutter wrapper files
+        shell: bash
+        run: |
+          flutter create --platforms=android --project-name kurashilog .
+          rm -f test/widget_test.dart
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Validate source
+        shell: bash
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Assert release manifest has no INTERNET permission
+        shell: bash
+        run: |
+          manifest="$(find build/app/intermediates -path '*release*' -name AndroidManifest.xml | head -n 1)"
+          test -n "$manifest"
+          if grep -q 'android.permission.INTERNET' "$manifest"; then
+            echo "Release manifest unexpectedly contains INTERNET permission: $manifest"
+            exit 1
+          fi
+
+      - name: Test-sign acceptance APK
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_apk="build/app/outputs/flutter-apk/app-release.apk"
+          test -f "$source_apk"
+
+          build_tools_version="$(ls -1 "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)"
+          apksigner="$ANDROID_HOME/build-tools/$build_tools_version/apksigner"
+          test -x "$apksigner"
+
+          keystore="$RUNNER_TEMP/kurashilog-acceptance.keystore"
+          keytool -genkeypair \
+            -keystore "$keystore" \
+            -storepass acceptance \
+            -keypass acceptance \
+            -alias acceptance \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 30 \
+            -dname "CN=Kurashilog Acceptance, OU=Testing, O=kaenozu, L=Tokyo, ST=Tokyo, C=JP"
+
+          asset="kurashilog-pr1-${SHORT_SHA}-acceptance.apk"
+          checksum="${asset}.sha256"
+          "$apksigner" sign \
+            --ks "$keystore" \
+            --ks-pass pass:acceptance \
+            --key-pass pass:acceptance \
+            --out "$asset" \
+            "$source_apk"
+          "$apksigner" verify --verbose --print-certs "$asset"
+          sha256sum "$asset" > "$checksum"
+
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+          echo "checksum=$checksum" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ steps.package.outputs.asset }}
+          CHECKSUM: ${{ steps.package.outputs.checksum }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/release-notes.md"
+          cat > "$notes" <<EOF
+          Android実機でPR #1を受入検証するためのAPKです。
+
+          - Source commit: \`${SOURCE_SHA}\`
+          - Variant: release
+          - Signing: 受入専用の一時テスト署名（本番配布用ではありません）
+          - Privacy gate: release Manifestに\`android.permission.INTERNET\`がないことをAction内で確認
+          - Validation: format / analyze / test / release build / APK署名検証
+
+          同じパッケージを別の署名でインストール済みの場合は、既存アプリをアンインストールしてから導入してください。実タイムラインデータをGitHubへアップロードしないでください。
+          EOF
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ASSET" "$CHECKSUM" --clobber
+            gh release edit "$RELEASE_TAG" \
+              --title "$RELEASE_TITLE" \
+              --notes-file "$notes" \
+              --prerelease
+          else
+            gh release create "$RELEASE_TAG" "$ASSET" "$CHECKSUM" \
+              --target "$SOURCE_SHA" \
+              --title "$RELEASE_TITLE" \
+              --notes-file "$notes" \
+              --prerelease
+          fi
