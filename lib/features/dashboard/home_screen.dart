@@ -9,13 +9,11 @@ import '../../domain/models/summaries.dart';
 import '../../shared/widgets.dart';
 import '../import_timeline/import_flow_screen.dart';
 
-/// ホーム（設計書 SC-02 / 6.1 表示優先順位）。
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final refresh = ref.watch(dashboardRefreshProvider);
     final month = ref.watch(selectedMonthProvider);
     final dashboard = ref.watch(_dashboardProvider(month));
 
@@ -37,28 +35,25 @@ class HomeScreen extends ConsumerWidget {
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('読み込みに失敗しました: $e')),
-        data: (d) => _HomeBody(dashboard: d, refresh: refresh),
+        data: (data) => _HomeBody(dashboard: data),
       ),
     );
   }
 }
 
 final _dashboardProvider =
-    FutureProvider.autoDispose.family<DashboardData, String>(
-  (ref, month) => ref.watch(dashboardUseCaseProvider).loadHome(selectedMonth: month),
-);
+    FutureProvider.autoDispose.family<DashboardData, String>((ref, month) {
+  ref.watch(dashboardRefreshProvider);
+  return ref.watch(dashboardUseCaseProvider).loadHome(selectedMonth: month);
+});
 
 class _HomeBody extends ConsumerWidget {
-  const _HomeBody({required this.dashboard, required this.refresh});
+  const _HomeBody({required this.dashboard});
 
   final DashboardData dashboard;
-  final int refresh;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // 再読込トリガー
-    ref.watch(dashboardRefreshProvider);
-
     if (!dashboard.hasData) {
       return _EmptyHome(
         onImport: () {
@@ -75,21 +70,20 @@ class _HomeBody extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.read(dashboardRefreshProvider.notifier).state++;
+        await ref.read(_dashboardProvider(dashboard.selectedMonth).future);
       },
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // 鮮度バッジ（設計書 6.1 優先順位 2）
           Row(
             children: [
               QualityBadge(quality: freshness.quality),
               const Spacer(),
-              if (dashboard.previousMonthly != null)
-                IconButton(
-                  tooltip: '前月を見る',
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: () => _shiftMonth(ref, -1),
-                ),
+              IconButton(
+                tooltip: '前月を見る',
+                icon: const Icon(Icons.chevron_left),
+                onPressed: () => _shiftMonth(ref, -1),
+              ),
               IconButton(
                 tooltip: '翌月を見る',
                 icon: const Icon(Icons.chevron_right),
@@ -103,10 +97,9 @@ class _HomeBody extends ConsumerWidget {
             style: theme.textTheme.titleLarge
                 ?.copyWith(fontWeight: FontWeight.w700),
           ),
-
-          // 古いデータの更新案内（設計書 7.3）
           if (freshness.quality == DataQuality.low ||
-              freshness.quality == DataQuality.quiteLow) ...[
+              freshness.quality == DataQuality.quiteLow ||
+              freshness.quality == DataQuality.historyOnly) ...[
             const SizedBox(height: 12),
             _StaleBanner(
               quality: freshness.quality,
@@ -118,10 +111,7 @@ class _HomeBody extends ConsumerWidget {
               },
             ),
           ],
-
           const SizedBox(height: 16),
-
-          // メトリクスカード 4 枚（設計書 6.1 優先順位 3）
           GridView.count(
             crossAxisCount: 2,
             shrinkWrap: true,
@@ -130,37 +120,30 @@ class _HomeBody extends ConsumerWidget {
             crossAxisSpacing: 12,
             childAspectRatio: 1.25,
             children: [
-              for (final m in dashboard.metrics)
+              for (final metric in dashboard.metrics)
                 MetricCard(
-                  icon: _iconFor(m.icon),
-                  label: m.label,
-                  value: m.value,
-                  deltaLabel: m.deltaLabel,
-                  note: m.note,
+                  icon: _iconFor(metric.icon),
+                  label: metric.label,
+                  value: metric.value,
+                  deltaLabel: metric.deltaLabel,
+                  note: metric.note,
                 ),
             ],
           ),
-
           const SizedBox(height: 16),
-
-          // カレンダーへの導線（今月の外出サマリ）
           Card(
             child: ListTile(
               leading: const Icon(Icons.calendar_month),
               title: const Text('カレンダーで見る'),
               subtitle: Text(
-                '今月の外出した日: ${dashboard.heatmap.values.where((v) => v == 1).length} 日',
+                '今月の外出した日: '
+                '${dashboard.heatmap.values.where((value) => value == 1).length} 日',
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                ref.read(appTabProvider.notifier).state = 1;
-              },
+              onTap: () => ref.read(appTabProvider.notifier).state = 1,
             ),
           ),
-
           const SizedBox(height: 16),
-
-          // インサイト（最大 3 件）
           if (dashboard.insights.isNotEmpty) ...[
             Text('気づき', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),
@@ -175,12 +158,12 @@ class _HomeBody extends ConsumerWidget {
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  'まだ気づきを生成できるデータ量がありません。\nデータを取り込むと、生活の変化が見つかります。',
+                  'まだ気づきを生成できるデータ量がありません。\n'
+                  'データを取り込むと、生活の変化が見つかります。',
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
             ),
-
           const SizedBox(height: 24),
         ],
       ),
@@ -189,23 +172,22 @@ class _HomeBody extends ConsumerWidget {
 
   void _shiftMonth(WidgetRef ref, int delta) {
     final parts = ref.read(selectedMonthProvider).split('-');
-    final y = int.parse(parts[0]);
-    final m = int.parse(parts[1]);
-    final d = DateTime(y, m + delta, 1);
+    final year = int.parse(parts[0]);
+    final month = int.parse(parts[1]);
+    final shifted = DateTime(year, month + delta);
     ref.read(selectedMonthProvider.notifier).state =
-        '${d.year.toString().padLeft(4, '0')}-'
-            '${d.month.toString().padLeft(2, '0')}';
+        '${shifted.year.toString().padLeft(4, '0')}-'
+        '${shifted.month.toString().padLeft(2, '0')}';
   }
 }
 
-/// ホームの空状態（設計書 6.1 優先順位 1）。
-class _EmptyHome extends ConsumerWidget {
+class _EmptyHome extends StatelessWidget {
   const _EmptyHome({required this.onImport});
 
   final VoidCallback onImport;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -213,8 +195,9 @@ class _EmptyHome extends ConsumerWidget {
         EmptyState(
           icon: Icons.map_outlined,
           title: 'まだデータがありません',
-          message:
-              'Google マップのタイムラインから書き出した JSON を\n取り込むと、生活の変化を分析できます。\nデータは端末内だけで処理されます。',
+          message: 'Google マップのタイムラインから書き出した JSON を\n'
+              '取り込むと、生活の変化を分析できます。\n'
+              'データは端末内だけで処理されます。',
           action: FilledButton.icon(
             onPressed: onImport,
             icon: const Icon(Icons.file_upload),
@@ -274,13 +257,14 @@ class _StaleBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'データが ${staleDays} 日更新されていません',
+                  'データが $staleDays 日更新されていません',
                   style: theme.textTheme.titleSmall
                       ?.copyWith(color: scheme.onErrorContainer),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  quality == DataQuality.quiteLow
+                  quality == DataQuality.quiteLow ||
+                          quality == DataQuality.historyOnly
                       ? '現在の傾向の精度が低下しています。再エクスポートして更新してください。'
                       : '最新の記録を取り込むと、より正確な分析ができます。',
                   style: theme.textTheme.bodySmall
@@ -329,9 +313,11 @@ class _InsightCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: theme.textTheme.titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 4),
                   Text(body, style: theme.textTheme.bodyMedium),
                 ],
@@ -344,7 +330,6 @@ class _InsightCard extends StatelessWidget {
   }
 }
 
-// メトリクスアイコン対応表
 IconData _iconFor(MetricIcon icon) => switch (icon) {
       MetricIcon.walking => Icons.directions_walk,
       MetricIcon.route => Icons.route,
