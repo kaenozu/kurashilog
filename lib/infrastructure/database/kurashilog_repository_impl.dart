@@ -5,6 +5,8 @@ import '../../application/repositories/kurashilog_repository.dart';
 import '../../domain/models/distance_method.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/models/summaries.dart';
+import '../../domain/services/clustering_service.dart';
+import '../../domain/services/distance_service.dart';
 import 'app_database.dart';
 
 class KurashilogRepositoryImpl implements KurashilogRepository {
@@ -179,7 +181,8 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       if (clusters.isEmpty) return;
 
       final rows = clusters.map((cluster) {
-        final existing = existingByKey[cluster.stableKey];
+        var existing = existingByKey[cluster.stableKey];
+        existing ??= _nearestExisting(existingRows, cluster);
         return _clusterToDb(
           StoredCluster(
             id: cluster.id,
@@ -198,6 +201,36 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       }).toList();
       await _db.batch((batch) => batch.insertAll(_db.placeClusters, rows));
     });
+  }
+
+  /// stableKey が変わったクラスタでも、既存クラスタ重心との距離が
+  /// クラスタ統合距離（maxMergeDistanceM）以内の最寄りから
+  /// ラベル・分析除外設定を引き継ぐ。
+  PlaceClusterRow? _nearestExisting(
+    List<PlaceClusterRow> existingRows,
+    StoredCluster cluster,
+  ) {
+    if (existingRows.isEmpty) return null;
+    final distance = const DistanceService();
+    final maxMatchM = const ClusteringService().maxMergeDistanceM;
+    final candidate = LatLngE7(cluster.centroidLatE7, cluster.centroidLngE7);
+
+    var best = existingRows.first;
+    var bestDistance = distance.haversineMeters(
+      candidate,
+      LatLngE7(best.centroidLatE7, best.centroidLngE7),
+    );
+    for (final row in existingRows.skip(1)) {
+      final candidateDistance = distance.haversineMeters(
+        candidate,
+        LatLngE7(row.centroidLatE7, row.centroidLngE7),
+      );
+      if (candidateDistance < bestDistance) {
+        best = row;
+        bestDistance = candidateDistance;
+      }
+    }
+    return bestDistance <= maxMatchM ? best : null;
   }
 
   @override

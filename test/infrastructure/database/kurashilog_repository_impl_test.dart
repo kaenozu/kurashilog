@@ -91,6 +91,70 @@ void main() {
     expect(rebuilt.excluded, isTrue);
   });
 
+  test(
+    'cluster rebuild keeps label and exclusion when centroid shifts '
+    'across the stable key boundary',
+    () async {
+      final at = DateTime.utc(2026, 7, 1);
+      final labelId = await repository.insertLabel(
+        StoredLabel(
+          id: 0,
+          displayName: '自宅',
+          isBasePlace: true,
+          createdAt: at,
+          updatedAt: at,
+        ),
+      );
+      await repository.replaceAllClusters([
+        _cluster(at, centroidLatE7: 356812360),
+      ]);
+      final first = (await repository.allClusters()).single;
+      await repository.updateClusterLabel(first.id, labelId);
+      await repository.setClusterExcluded(first.id, true);
+
+      final shifted = _cluster(
+        at,
+        centroidLatE7: 356812400,
+        stableKey: 'cluster|3568124|13976712',
+      );
+      await repository.replaceAllClusters([shifted]);
+      final rebuilt = (await repository.allClusters()).single;
+      expect(rebuilt.labelId, labelId);
+      expect(rebuilt.labelName, '自宅');
+      expect(rebuilt.excluded, isTrue);
+    },
+  );
+
+  test('cluster rebuild drops settings for a far-away cluster', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final labelId = await repository.insertLabel(
+      StoredLabel(
+        id: 0,
+        displayName: '自宅',
+        isBasePlace: true,
+        createdAt: at,
+        updatedAt: at,
+      ),
+    );
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812360),
+    ]);
+    final first = (await repository.allClusters()).single;
+    await repository.updateClusterLabel(first.id, labelId);
+    await repository.setClusterExcluded(first.id, true);
+
+    final far = _cluster(
+      at,
+      centroidLatE7: 357512360,
+      centroidLngE7: 1398671250,
+      stableKey: 'cluster|3575123|13986712',
+    );
+    await repository.replaceAllClusters([far]);
+    final rebuilt = (await repository.allClusters()).single;
+    expect(rebuilt.labelId, isNull);
+    expect(rebuilt.excluded, isFalse);
+  });
+
   test('runInTransaction rolls raw records back on failure', () async {
     final at = DateTime.utc(2026, 7, 1);
     await expectLater(
@@ -116,12 +180,17 @@ void main() {
   });
 }
 
-StoredCluster _cluster(DateTime at, {required int centroidLatE7}) =>
+StoredCluster _cluster(
+  DateTime at, {
+  required int centroidLatE7,
+  int centroidLngE7 = 1397671250,
+  String stableKey = 'cluster|3568123|13976712',
+}) =>
     StoredCluster(
       id: 0,
-      stableKey: 'cluster|3568123|13976712',
+      stableKey: stableKey,
       centroidLatE7: centroidLatE7,
-      centroidLngE7: 1397671250,
+      centroidLngE7: centroidLngE7,
       radiusM: 100,
       visitCount: 1,
       dwellSeconds: 3600,

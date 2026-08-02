@@ -61,7 +61,8 @@ class AnalysisCoordinator {
           ),
         )
         .toList();
-    final clusters = await Isolate.run(() => clustering.cluster(samples));
+    final localClustering = clustering;
+    final clusters = await Isolate.run(() => localClustering.cluster(samples));
 
     await repository.replaceAllClusters(
       clusters
