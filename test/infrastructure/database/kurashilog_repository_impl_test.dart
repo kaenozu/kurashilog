@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/application/models/persistence_models.dart';
+import 'package:kurashilog/domain/models/distance_method.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
 import 'package:kurashilog/infrastructure/database/kurashilog_repository_impl.dart';
 
@@ -177,6 +178,42 @@ void main() {
       throwsStateError,
     );
     expect(await repository.countVisits(), 0);
+  });
+
+  test('inserting the same sourceKey twice does not increase counts', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final visit = StoredVisit(
+      id: 0,
+      sourceKey: 'visit-same-source-key',
+      startAtUtc: at,
+      endAtUtc: at.add(const Duration(hours: 1)),
+      latE7: 351234560,
+      lngE7: 1396543210,
+    );
+    final movement = StoredMovement(
+      id: 0,
+      sourceKey: 'movement-same-source-key',
+      startAtUtc: at.add(const Duration(hours: 1)),
+      endAtUtc: at.add(const Duration(hours: 2)),
+      distanceMethod: DistanceMethod.recorded,
+      distanceM: 1200,
+    );
+
+    final first = await repository.insertNewRecords(
+      visits: [visit],
+      movements: [movement],
+    );
+    expect(first.addedVisits, 1);
+    expect(first.addedMovements, 1);
+
+    final second = await repository.insertNewRecords(
+      visits: [visit],
+      movements: [movement],
+    );
+    expect(second.addedVisits, 0);
+    expect(second.addedMovements, 0);
+    expect(await repository.countVisits(), 1);
+    expect(await repository.countMovements(), 1);
   });
 }
 

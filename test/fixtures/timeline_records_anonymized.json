@@ -1,0 +1,158 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-07-01T00:00:00Z",
+      "endTime": "2026-07-01T01:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-001",
+          "semanticType": "HOME",
+          "placeLocation": "geo:35.123456,139.654321",
+          "probability": 0.92
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-02T00:00:00Z",
+      "endTime": "2026-07-02T01:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-001",
+          "semanticType": "HOME",
+          "placeLocation": "geo:35.123456,139.654321"
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-03T02:00:00Z",
+      "endTime": "2026-07-03T03:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "semanticType": "WORK",
+          "placeLocation": "geo:35.234567,139.765432"
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-04T02:00:00Z",
+      "endTime": "2026-07-04T03:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-003",
+          "semanticType": "GYM",
+          "location": {
+            "latitudeE7": 352345670,
+            "longitudeE7": 1397654320
+          }
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-05T02:00:00Z",
+      "endTime": "2026-07-05T03:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-004",
+          "semanticType": "GROCERY",
+          "placeLocation": {
+            "latE7": 353456780,
+            "lngE7": 1398765430
+          }
+        },
+        "confidence": 0.9,
+        "otherAttributes": {
+          "unknownFlag": true
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-06T02:00:00Z",
+      "endTime": "2026-07-06T03:00:00Z",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-005"
+        }
+      },
+      "timelinePath": []
+    },
+    {
+      "startTime": "2026-07-07T02:00:00Z",
+      "endTime": "2026-07-07T03:00:00Z",
+      "activity": {
+        "start": "WALKING",
+        "topCandidate": {
+          "type": "WALKING",
+          "probability": 0.85
+        },
+        "distanceMeters": 1520.0
+      },
+      "timelinePath": [
+        {
+          "point": "geo:35.123456,139.654321",
+          "time": "2026-07-07T02:00:00Z"
+        },
+        {
+          "point": "geo:35.134567,139.665432",
+          "time": "2026-07-07T02:30:00Z"
+        },
+        {
+          "point": "geo:35.145678,139.676543",
+          "time": "2026-07-07T03:00:00Z"
+        }
+      ]
+    },
+    {
+      "startTime": "2026-07-08T02:00:00Z",
+      "endTime": "2026-07-08T03:00:00Z",
+      "activity": {
+        "start": "IN_VEHICLE",
+        "topCandidate": {
+          "type": "IN_VEHICLE",
+          "probability": 0.7
+        },
+        "distanceMeters": 9000.0,
+        "calories": 100,
+        "otherAttributes": {
+          "unknownFlag": true
+        }
+      },
+      "timelinePath": [
+        {
+          "point": "geo:35.145678,139.676543",
+          "time": "2026-07-08T02:00:00Z"
+        },
+        {
+          "point": "geo:35.156789,139.687654",
+          "time": "2026-07-08T02:30:00Z"
+        },
+        {
+          "point": "geo:35.167890,139.698765",
+          "time": "2026-07-08T03:00:00Z"
+        }
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "timestampMs": "1782878400000",
+      "latitudeE7": 351234560,
+      "longitudeE7": 1396543210,
+      "accuracy": 20
+    },
+    {
+      "timestampMs": "1782880200000",
+      "latitudeE7": 351235600,
+      "longitudeE7": 1396544000,
+      "accuracy": 25
+    }
+  ],
+  "activitySegments": [
+    {
+      "startTime": "2026-07-01T05:00:00Z",
+      "endTime": "2026-07-01T05:30:00Z",
+      "activityType": "WALKING",
+      "distance": 800
+    }
+  ],
+  "unknownTopLevelKey": null
+}
