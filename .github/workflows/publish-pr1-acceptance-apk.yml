@@ -7,10 +7,11 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: publish-pr1-acceptance-apk
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   publish:
@@ -120,16 +121,27 @@ jobs:
           同じパッケージを別の署名でインストール済みの場合は、既存アプリをアンインストールしてから導入してください。実タイムラインデータをGitHubへアップロードしないでください。
           EOF
 
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$ASSET" "$CHECKSUM" --clobber
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$ASSET" "$CHECKSUM" --clobber --repo "$GITHUB_REPOSITORY"
             gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
               --title "$RELEASE_TITLE" \
               --notes-file "$notes" \
               --prerelease
           else
             gh release create "$RELEASE_TAG" "$ASSET" "$CHECKSUM" \
+              --repo "$GITHUB_REPOSITORY" \
               --target "$SOURCE_SHA" \
               --title "$RELEASE_TITLE" \
               --notes-file "$notes" \
               --prerelease
           fi
+
+      - name: Record completion on PR 1
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ steps.package.outputs.asset }}
+        run: |
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
+          gh pr comment 1 --repo "$GITHUB_REPOSITORY" --body "受入用APKをGitHub prereleaseへ配置しました。\n\n- Release: ${release_url}\n- Asset: \`${ASSET}\`\n- Source: \`${SOURCE_SHA}\`\n- Validation: format / analyze / test / release build / Manifest privacy gate / APK署名検証 PASS\n- Signing: 受入専用の一時テスト署名（本番配布用ではありません）\n\n実データはGitHubへ添付せず、端末内からこのAPKへインポートしてください。"
