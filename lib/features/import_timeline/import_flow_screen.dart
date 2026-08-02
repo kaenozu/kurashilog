@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../application/use_cases/import_use_case.dart';
-import '../../shared/widgets.dart';
 import 'import_flow_controller.dart';
 
 /// インポート画面（設計書 SC-03 インポート / SC-04 インポート結果）。

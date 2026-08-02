@@ -111,7 +111,7 @@ class _TimelineRow extends ConsumerWidget {
     final subtitle = isVisit
         ? (entry.dwellMinutes != null ? '滞在 ${entry.dwellMinutes!} 分' : '訪問')
         : [
-            if (entry.distanceM != null) '${_km(entry.distanceM!)}',
+            if (entry.distanceM != null) _km(entry.distanceM!),
             if (entry.activityType != null) _activityLabel(entry.activityType!),
             if (entry.distanceLabel != null) entry.distanceLabel!,
           ].join(' ・ ');

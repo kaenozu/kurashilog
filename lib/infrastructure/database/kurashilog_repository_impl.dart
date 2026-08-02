@@ -6,7 +6,6 @@ import '../../domain/models/distance_method.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/models/summaries.dart';
 import 'app_database.dart';
-import 'tables.dart';
 
 class KurashilogRepositoryImpl implements KurashilogRepository {
   KurashilogRepositoryImpl(this._db);

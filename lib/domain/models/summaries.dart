@@ -1,8 +1,6 @@
 /// 日次・月次集計のドメイン値（設計書 6.3 / 10.1 キャッシュ戦略）。
 library;
 
-import 'data_quality.dart';
-
 /// 日次集計の入力（訪問）。
 class DailyVisitInput {
   const DailyVisitInput({

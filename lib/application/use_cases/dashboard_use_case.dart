@@ -5,7 +5,6 @@ import '../../domain/services/freshness_service.dart';
 import '../../domain/services/summary_service.dart';
 import '../analysis/analysis_coordinator.dart';
 import '../analysis/window.dart';
-import '../models/persistence_models.dart';
 import '../repositories/kurashilog_repository.dart';
 
 /// ホーム表示データ（設計書 7.4 DashboardViewModel）。

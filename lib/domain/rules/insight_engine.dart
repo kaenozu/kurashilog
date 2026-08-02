@@ -52,7 +52,8 @@ class InsightEngine {
             ? InsightSeverity.attention
             : InsightSeverity.information,
         title: '外出の頻度が${ratio.abs() >= 0.30 ? '大きく' : ''}変化しました',
-        body: '外出した日が前期間より${delta.abs()}日$directionました'
+        body:
+            '外出した日が前期間より${delta.abs()}日$directionました'
             '（${context.previousOutingDays}日→${context.currentOutingDays}日）。',
         score: 70 + (ratio.abs() * 100).round(),
         metricJson: {
@@ -82,7 +83,8 @@ class InsightEngine {
             ? InsightSeverity.attention
             : InsightSeverity.information,
         title: '移動量が${ratio.abs() >= 0.40 ? '大きく' : ''}変化しました',
-        body: '移動量が前期間より${(ratio.abs() * 100).round()}%$directionています'
+        body:
+            '移動量が前期間より${(ratio.abs() * 100).round()}%$directionています'
             '（${(context.previousDistanceM / 1000).toStringAsFixed(0)}km→'
             '${(context.currentDistanceM / 1000).toStringAsFixed(0)}km）。',
         score: 60 + (ratio.abs() * 100).round(),
@@ -147,10 +149,7 @@ class InsightEngine {
         title: '平日の帰宅時間が変わりました',
         body: '平日の帰宅時刻の中央値が${difference.abs()}分$directionなっています。',
         score: 55 + difference.abs(),
-        metricJson: {
-          'previousMinutes': previous,
-          'currentMinutes': current,
-        },
+        metricJson: {'previousMinutes': previous, 'currentMinutes': current},
       ),
     ];
   }
@@ -170,7 +169,8 @@ class InsightEngine {
             ? InsightSeverity.attention
             : InsightSeverity.information,
         title: '休日の行動範囲が変わりました',
-        body: '休日の行動範囲が$directionました'
+        body:
+            '休日の行動範囲が$directionました'
             '（約${_distance(previous)}→約${_distance(current)}）。',
         score: 45 + (ratio.abs() * 100).round(),
         metricJson: {'previousM': previous, 'currentM': current},
@@ -183,7 +183,6 @@ class InsightEngine {
     return letters[(id - 1).clamp(0, letters.length - 1).toInt()];
   }
 
-  String _distance(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _distance(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }
