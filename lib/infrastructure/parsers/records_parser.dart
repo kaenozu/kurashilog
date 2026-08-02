@@ -8,28 +8,20 @@ import '../../domain/services/distance_service.dart';
 import 'json_event_parser.dart';
 import 'timeline_parser.dart';
 
-/// Records.json（Google マップ タイムラインの手動エクスポート）のパーサー。
-///
-/// 対応形式:
-/// - 現行: `semanticSegments`（visit / activity セグメント）… 優先
-/// - 旧形式: `locations`（点列）＋ `activitySegments`
-///
-/// 設計書 5.1 のデータフローに従い、Isolate でストリーム解析し、
-/// [NormalizedRecord] を小分けに返す。全文 String 化はしない。
+/// Records.json（Google マップ タイムラインの手動エクスポート）の
+/// ストリーミングパーサー。
 class RecordsTimelineParser implements TimelineParser {
   const RecordsTimelineParser({
     this.sourceKeyGenerator = const SourceKeyGenerator(
-        schemaType: 'timeline-records'),
+      schemaType: 'timeline-records',
+    ),
     this.distanceService = const DistanceService(),
   });
 
   final SourceKeyGenerator sourceKeyGenerator;
   final DistanceService distanceService;
 
-  /// 旧形式の点列を訪問へ変換する際の滞在半径（メートル）。
   static const double legacyStayRadiusM = 150.0;
-
-  /// 旧形式の点列の最小間引き（連続点の同一滞在判定に使う）。
   static const int legacyMinConsecutivePoints = 2;
 
   @override
@@ -44,46 +36,70 @@ class RecordsTimelineParser implements TimelineParser {
     DateTime? minAt;
     DateTime? maxAt;
     final warnings = <String, ImportWarning>{};
+    final legacyPoints = <_LegacyPoint>[];
 
     void warn(String code, String message) {
       warnings[code] = (warnings[code] ?? ImportWarning(code, message))
           .mergedWith(ImportWarning(code, message));
     }
 
-    final legacyPoints = <_LegacyPoint>[];
+    void mergeRange(DateTime? start, DateTime? end) {
+      if (start != null && (minAt == null || start.isBefore(minAt!))) {
+        minAt = start;
+      }
+      if (end != null && (maxAt == null || end.isAfter(maxAt!))) {
+        maxAt = end;
+      }
+    }
 
+    ImportParseException? parseError;
     await _scan(
       source,
       token,
-      onSegment: (seg) {
+      onSegment: (segment) {
         count++;
-        final (s, e) = _segmentRange(seg);
-        _mergeRange(s, e);
+        final (start, end) = _segmentRange(segment);
+        mergeRange(start, end);
       },
-      onLegacyPoint: (p) {
+      onLegacyPoint: (point) {
         count++;
-        legacyPoints.add(p);
-        _mergeRange(p.at, p.at);
+        legacyPoints.add(point);
+        mergeRange(point.at, point.at);
       },
-      onUnsupportedSegment: () => warn('IMP-002', '未対応のセグメントを無視しました'),
-      onError: (code, message) => warn(code, message),
+      onUnsupportedSegment: () =>
+          warn('PAR-001', '未対応のセグメントを無視しました'),
+      onError: (code, message) {
+        parseError ??= ImportParseException(code, message);
+      },
     );
 
     if (token.isCancelled) {
       return const PreviewResult(
         schemaType: 'timeline-records',
+        minAt: null,
+        maxAt: null,
         approxRecordCount: 0,
         errorCode: 'IMP-005',
         errorMessage: 'キャンセルされました',
       );
     }
+    if (parseError != null) {
+      return PreviewResult(
+        schemaType: schemaType,
+        minAt: minAt,
+        maxAt: maxAt,
+        approxRecordCount: count,
+        warnings: warnings.values.toList(),
+        errorCode: parseError!.code,
+        errorMessage: parseError!.message,
+      );
+    }
 
     if (legacyPoints.isNotEmpty) {
-      // 点列から訪問・移動を導出した場合の件数・期間は導出後に確定
       final derived = _deriveLegacyRecords(legacyPoints);
       count = derived.length;
-      for (final r in derived) {
-        _mergeRange(r.startAtUtc, r.endAtUtc);
+      for (final record in derived) {
+        mergeRange(record.startAtUtc, record.endAtUtc);
       }
     }
 
@@ -94,11 +110,6 @@ class RecordsTimelineParser implements TimelineParser {
       approxRecordCount: count,
       warnings: warnings.values.toList(),
     );
-
-    void _mergeRange(DateTime? s, DateTime? e) {
-      if (s != null && (minAt == null || s.isBefore(minAt!))) minAt = s;
-      if (e != null && (maxAt == null || e.isAfter(maxAt!))) maxAt = e;
-    }
   }
 
   @override
@@ -106,9 +117,8 @@ class RecordsTimelineParser implements TimelineParser {
     Stream<List<int>> source,
     CancellationToken token,
   ) {
-    // コールバックからは yield できないため、StreamController 経由で返す。
     final controller = StreamController<NormalizedRecord>();
-    _runParse(source, token, controller);
+    unawaited(_runParse(source, token, controller));
     return controller.stream;
   }
 
@@ -119,54 +129,50 @@ class RecordsTimelineParser implements TimelineParser {
   ) async {
     try {
       final legacyPoints = <_LegacyPoint>[];
+      ImportParseException? parseError;
       await _scan(
         source,
         token,
-        onSegment: (seg) {
-          final record = _segmentToRecord(seg);
+        onSegment: (segment) {
+          final record = _segmentToRecord(segment);
           if (record != null) controller.add(record);
         },
-        onLegacyPoint: (p) => legacyPoints.add(p),
-        onUnsupportedSegment: () {
-          // 未知フィールド・未対応セグメントは無視（警告はプレビュー側で計上）
-        },
+        onLegacyPoint: legacyPoints.add,
+        onUnsupportedSegment: () {},
         onError: (code, message) {
-          controller.addError(ImportParseException(code, message));
+          parseError ??= ImportParseException(code, message);
         },
       );
 
       if (token.isCancelled) {
-        controller.addError(
-            const ImportParseException('IMP-005', 'キャンセルされました'));
-        return;
+        throw const ImportParseException('IMP-005', 'キャンセルされました');
       }
+      if (parseError != null) throw parseError!;
 
-      if (legacyPoints.isNotEmpty) {
-        for (final record in _deriveLegacyRecords(legacyPoints)) {
-          if (token.isCancelled) break;
-          controller.add(record);
+      for (final record in _deriveLegacyRecords(legacyPoints)) {
+        if (token.isCancelled) {
+          throw const ImportParseException('IMP-005', 'キャンセルされました');
         }
+        controller.add(record);
       }
-    } catch (e) {
-      controller.addError(e);
+    } catch (error, stackTrace) {
+      controller.addError(error, stackTrace);
     } finally {
       await controller.close();
     }
   }
 
-  /// スキャン本体。セグメント / 点列 / エラーをコールバックで通知する。
   Future<void> _scan(
     Stream<List<int>> source,
-    CancellationToken token,
-    {
-    required void Function(Map<String, Object?> seg) onSegment,
-    required void Function(_LegacyPoint p) onLegacyPoint,
+    CancellationToken token, {
+    required void Function(Map<String, Object?> segment) onSegment,
+    required void Function(_LegacyPoint point) onLegacyPoint,
     required void Function() onUnsupportedSegment,
     required void Function(String code, String message) onError,
   }) async {
     final parser = JsonEventParser();
     final collector = _SegmentCollector();
-    var rootDepth = 0;
+    var objectDepth = 0;
     var targetArray = '';
 
     try {
@@ -175,170 +181,168 @@ class RecordsTimelineParser implements TimelineParser {
         for (final event in parser.addChunk(chunk)) {
           switch (event.type) {
             case JsonEventType.objectStart:
-              rootDepth++;
+              objectDepth++;
               if (collector.active) {
                 collector.handle(event);
-              } else if (rootDepth == 2 && targetArray.isNotEmpty) {
-                // ターゲット配列内のオブジェクトの開始 → 捕捉開始
+              } else if (objectDepth == 2 && targetArray.isNotEmpty) {
                 collector.handle(event);
               }
             case JsonEventType.objectEnd:
               if (collector.active) {
                 collector.handle(event);
-                if (!collector.active && collector.completed != null) {
-                  final seg = collector.completed!;
-                  collector.completed = null;
-                  _dispatch(seg, targetArray,
-                      onSegment: onSegment,
-                      onLegacyPoint: onLegacyPoint,
-                      onUnsupported: onUnsupportedSegment);
+                final completed = collector.takeCompleted();
+                if (completed != null) {
+                  _dispatch(
+                    completed,
+                    targetArray,
+                    onSegment: onSegment,
+                    onLegacyPoint: onLegacyPoint,
+                    onUnsupported: onUnsupportedSegment,
+                  );
                 }
               }
-              if (rootDepth > 0) rootDepth--;
+              if (objectDepth > 0) objectDepth--;
             case JsonEventType.arrayStart:
-              if (collector.active) {
-                collector.handle(event);
-              }
+              if (collector.active) collector.handle(event);
             case JsonEventType.arrayEnd:
               if (collector.active) {
                 collector.handle(event);
-              } else if (rootDepth == 1 && targetArray.isNotEmpty) {
-                targetArray = ''; // ルートレベルの配列が閉じた
+              } else if (objectDepth == 1 && targetArray.isNotEmpty) {
+                targetArray = '';
               }
             case JsonEventType.key:
               if (collector.active) {
                 collector.handle(event);
-              } else if (rootDepth == 1) {
-                final k = event.key ?? '';
-                if (k == 'semanticSegments' ||
-                    k == 'locations' ||
-                    k == 'activitySegments') {
-                  targetArray = k;
+              } else if (objectDepth == 1) {
+                final key = event.key ?? '';
+                if (key == 'semanticSegments' ||
+                    key == 'locations' ||
+                    key == 'activitySegments') {
+                  targetArray = key;
                 }
               }
             case JsonEventType.value:
-              if (collector.active) {
-                collector.handle(event);
-              }
+              if (collector.active) collector.handle(event);
           }
         }
       }
       parser.finish();
-    } on JsonParseException catch (e) {
-      onError('IMP-003', 'JSON の構文エラー: ${e.message}');
-    } on FormatException catch (e) {
-      onError('IMP-003', 'JSON のデコードエラー: $e');
+    } on JsonParseException catch (error) {
+      onError('IMP-003', 'JSON の構文エラー: ${error.message}');
+    } on FormatException catch (error) {
+      onError('IMP-003', 'JSON のデコードエラー: $error');
     }
   }
 
   void _dispatch(
-    Map<String, Object?> seg,
+    Map<String, Object?> segment,
     String targetArray, {
     required void Function(Map<String, Object?>) onSegment,
     required void Function(_LegacyPoint) onLegacyPoint,
     required void Function() onUnsupported,
   }) {
-    if (targetArray == 'semanticSegments' || targetArray == 'activitySegments') {
-      onSegment(seg);
-    } else if (targetArray == 'locations') {
-      final p = _LegacyPoint.fromMap(seg);
-      if (p != null) onLegacyPoint(p);
-    } else {
-      onUnsupported();
+    if (targetArray == 'semanticSegments' ||
+        targetArray == 'activitySegments') {
+      onSegment(segment);
+      return;
     }
+    if (targetArray == 'locations') {
+      final point = _LegacyPoint.fromMap(segment);
+      if (point != null) onLegacyPoint(point);
+      return;
+    }
+    onUnsupported();
   }
 
-  // --- セグメント → 正規化レコード ---
-
-  NormalizedRecord? _segmentToRecord(Map<String, Object?> seg) {
-    final (start, end) = _segmentRange(seg);
+  NormalizedRecord? _segmentToRecord(Map<String, Object?> segment) {
+    final (start, end) = _segmentRange(segment);
     if (start == null || end == null) return null;
 
-    final visit = seg['visit'];
+    final visit = segment['visit'];
     if (visit is Map<String, Object?>) {
       return _visitToRecord(visit, start, end);
     }
 
-    final activity = seg['activity'];
+    final activity = segment['activity'];
     if (activity is Map<String, Object?>) {
-      return _activityToRecord(activity, start, end, seg);
+      return _activityToRecord(activity, start, end, segment);
     }
-
     return null;
   }
 
-  /// セグメントの開始・終了時刻を返す（semanticSegments は start/end、
-  /// 旧 activitySegments は duration を使う）。
-  (DateTime?, DateTime?) _segmentRange(Map<String, Object?> seg) {
-    final start = _ts(seg['start']);
-    final end = _ts(seg['end']);
+  (DateTime?, DateTime?) _segmentRange(Map<String, Object?> segment) {
+    final start = _timestamp(segment['start']) ??
+        _timestamp(segment['startTime']) ??
+        _timestamp(segment['startTimestamp']);
+    final end = _timestamp(segment['end']) ??
+        _timestamp(segment['endTime']) ??
+        _timestamp(segment['endTimestamp']);
     if (start != null || end != null) return (start, end);
-    final duration = seg['duration'];
+
+    final duration = segment['duration'];
     if (duration is Map<String, Object?>) {
       return (
-        _ts(duration['startTimestampMs']),
-        _ts(duration['endTimestampMs']),
+        _timestamp(duration['startTimestampMs']) ??
+            _timestamp(duration['startTime']),
+        _timestamp(duration['endTimestampMs']) ??
+            _timestamp(duration['endTime']),
       );
     }
     return (null, null);
   }
 
   NormalizedVisit? _visitToRecord(
-      Map<String, Object?> visit, DateTime start, DateTime end) {
-    final loc = _visitLocation(visit);
-    final lat = loc?['latitudeE7'];
-    final lng = loc?['longitudeE7'];
-    int? latE7;
-    int? lngE7;
-    if (lat is num && lng is num) {
-      latE7 = lat.toInt();
-      lngE7 = lng.toInt();
-    }
-    if (latE7 == null || lngE7 == null) return null;
+    Map<String, Object?> visit,
+    DateTime start,
+    DateTime end,
+  ) {
+    final candidate = visit['topCandidate'];
+    final candidateMap =
+        candidate is Map<String, Object?> ? candidate : null;
+    final coordinate = _coordinateFrom(_visitLocation(visit));
+    if (coordinate == null) return null;
 
-    final placeId = (visit['topCandidate'] is Map<String, Object?>)
-        ? (visit['topCandidate'] as Map<String, Object?>)['placeId']
-        : null;
-    final semanticType = (visit['topCandidate'] is Map<String, Object?>)
-        ? (visit['topCandidate'] as Map<String, Object?>)['semanticType']
-        : null;
-    final confidence = visit['locationConfidence'];
+    final placeId = candidateMap?['placeId'];
+    final semanticType = candidateMap?['semanticType'];
+    final confidence = _number(visit['locationConfidence']) ??
+        _number(candidateMap?['probability']);
 
-    final key = placeId is String
-        ? sourceKeyGenerator
-            .fromStableId(recordType: 'visit', id: placeId)
-        : sourceKeyGenerator.fingerprint(
-            recordType: 'visit',
-            startAtUtc: start,
-            endAtUtc: end,
-            latE7: latE7,
-            lngE7: lngE7,
-          );
+    // placeId は地点の ID であって訪問イベントの ID ではない。
+    // 時刻と座標を含む指紋を使い、同じ場所への再訪を保持する。
+    final key = sourceKeyGenerator.fingerprint(
+      recordType: 'visit',
+      startAtUtc: start,
+      endAtUtc: end,
+      latE7: coordinate.latE7,
+      lngE7: coordinate.lngE7,
+      normalizedActivity: placeId is String ? placeId : null,
+    );
 
     return NormalizedVisit(
       sourceKey: key,
       startAtUtc: start,
       endAtUtc: end,
-      latLng: LatLngE7(latE7, lngE7),
+      latLng: coordinate,
       sourceLabel: semanticType is String ? semanticType : null,
-      confidence: confidence is num ? confidence.toDouble() : null,
+      confidence: confidence,
     );
   }
 
-  NormalizedMovement _activityToRecord(Map<String, Object?> activity,
-      DateTime start, DateTime end, Map<String, Object?> segment) {
+  NormalizedMovement _activityToRecord(
+    Map<String, Object?> activity,
+    DateTime start,
+    DateTime end,
+    Map<String, Object?> segment,
+  ) {
     final activityType = activity['activityType'];
-    final distance = activity['distance'];
-
     var path = _waypoints(activity['waypoints']);
-    if (path.isEmpty) {
-      path = _timelinePathCoords(segment['timelinePath']);
-    }
+    if (path.isEmpty) path = _timelinePathCoordinates(segment['timelinePath']);
 
-    int? distanceM;
-    DistanceMethod method;
-    if (distance is num && distance > 0) {
-      distanceM = distance.toInt();
+    final recordedDistance = _number(activity['distance']);
+    final int? distanceM;
+    final DistanceMethod method;
+    if (recordedDistance != null && recordedDistance > 0) {
+      distanceM = recordedDistance.round();
       method = DistanceMethod.recorded;
     } else if (path.length >= 2) {
       distanceM = distanceService.pathMeters(path).round();
@@ -348,17 +352,17 @@ class RecordsTimelineParser implements TimelineParser {
       method = DistanceMethod.unknown;
     }
 
-    final confidence = activity['confidence'];
-    final startLatLng = path.isNotEmpty ? path.first : null;
-    final endLatLng = path.isNotEmpty ? path.last : null;
-
+    final normalizedActivity =
+        activityType is String ? activityType : null;
+    final startCoordinate = path.isNotEmpty ? path.first : null;
+    final endCoordinate = path.isNotEmpty ? path.last : null;
     final key = sourceKeyGenerator.fingerprint(
       recordType: 'movement',
       startAtUtc: start,
       endAtUtc: end,
-      latE7: startLatLng?.latE7,
-      lngE7: startLatLng?.lngE7,
-      normalizedActivity: activityType is String ? activityType : null,
+      latE7: startCoordinate?.latE7,
+      lngE7: startCoordinate?.lngE7,
+      normalizedActivity: normalizedActivity,
     );
 
     return NormalizedMovement(
@@ -367,98 +371,103 @@ class RecordsTimelineParser implements TimelineParser {
       endAtUtc: end,
       distanceM: distanceM,
       distanceMethod: method,
-      activityType: activityType is String ? activityType : null,
-      confidence: confidence is num ? confidence.toDouble() : null,
-      startLatLng: startLatLng,
-      endLatLng: endLatLng,
+      activityType: normalizedActivity,
+      confidence: _number(activity['confidence']),
+      startLatLng: startCoordinate,
+      endLatLng: endCoordinate,
       path: path,
     );
   }
 
-  Map<String, Object?>? _visitLocation(Map<String, Object?> visit) {
-    final top = visit['topCandidate'];
-    if (top is Map<String, Object?>) {
-      final l = top['location'];
-      if (l is Map<String, Object?>) return l;
-      return top;
+  Object? _visitLocation(Map<String, Object?> visit) {
+    final topCandidate = visit['topCandidate'];
+    if (topCandidate is Map<String, Object?>) {
+      return topCandidate['location'] ??
+          topCandidate['placeLocation'] ??
+          topCandidate;
     }
-    final pl = visit['placeLocation'];
-    if (pl is Map<String, Object?>) return pl;
-    final cands = visit['candidates'];
-    if (cands is List && cands.isNotEmpty) {
-      final c0 = cands.first;
-      if (c0 is Map<String, Object?>) {
-        final l = c0['location'];
-        if (l is Map<String, Object?>) return l;
-        return c0;
+    final placeLocation = visit['placeLocation'];
+    if (placeLocation != null) return placeLocation;
+    final candidates = visit['candidates'];
+    if (candidates is List && candidates.isNotEmpty) {
+      final first = candidates.first;
+      if (first is Map<String, Object?>) {
+        return first['location'] ?? first['placeLocation'] ?? first;
       }
     }
     return null;
   }
 
-  List<LatLngE7> _waypoints(Object? waypoints) {
-    if (waypoints is! List) return const [];
-    final out = <LatLngE7>[];
-    for (final w in waypoints) {
-      if (w is Map<String, Object?>) {
-        final lat = w['latE7'];
-        final lng = w['lngE7'];
-        if (lat is num && lng is num) {
-          out.add(LatLngE7(lat.toInt(), lng.toInt()));
+  LatLngE7? _coordinateFrom(Object? value) {
+    if (value is Map<String, Object?>) {
+      final lat = _number(value['latitudeE7'] ?? value['latE7']);
+      final lng = _number(value['longitudeE7'] ?? value['lngE7']);
+      if (lat != null && lng != null) {
+        return LatLngE7(lat.round(), lng.round());
+      }
+      return _coordinateFrom(value['point']);
+    }
+    if (value is String) {
+      final normalized = value.startsWith('geo:') ? value.substring(4) : value;
+      final parts = normalized.split(',');
+      if (parts.length >= 2) {
+        final lat = double.tryParse(parts[0].trim());
+        final lng = double.tryParse(parts[1].split('?').first.trim());
+        if (lat != null && lng != null) {
+          return LatLngE7((lat * 1e7).round(), (lng * 1e7).round());
         }
       }
     }
-    return out;
+    return null;
   }
 
-  List<LatLngE7> _timelinePathCoords(Object? tp) {
-    if (tp is! List) return const [];
-    final out = <LatLngE7>[];
-    for (final e in tp) {
-      if (e is Map<String, Object?>) {
-        final p = e['point'];
-        if (p is String) {
-          final parts = p.split(',');
-          if (parts.length == 2) {
-            final lat = double.tryParse(parts[0].trim());
-            final lng = double.tryParse(parts[1].trim());
-            if (lat != null && lng != null) {
-              out.add(LatLngE7((lat * 1e7).round(), (lng * 1e7).round()));
-            }
-          }
-        }
+  List<LatLngE7> _waypoints(Object? value) {
+    if (value is! List) return const [];
+    return value.map(_coordinateFrom).whereType<LatLngE7>().toList();
+  }
+
+  List<LatLngE7> _timelinePathCoordinates(Object? value) {
+    if (value is! List) return const [];
+    final coordinates = <LatLngE7>[];
+    for (final entry in value) {
+      if (entry is Map<String, Object?>) {
+        final coordinate = _coordinateFrom(entry['point'] ?? entry);
+        if (coordinate != null) coordinates.add(coordinate);
       }
     }
-    return out;
+    return coordinates;
   }
-
-  // --- 旧形式: 点列 → 訪問・移動 ---
 
   List<NormalizedRecord> _deriveLegacyRecords(List<_LegacyPoint> points) {
     if (points.isEmpty) return const [];
-    points.sort((a, b) => a.at.compareTo(b.at));
+    final ordered = [...points]..sort((a, b) => a.at.compareTo(b.at));
 
     final visits = <NormalizedVisit>[];
-    var i = 0;
-    while (i < points.length) {
-      final anchor = points[i];
-      var j = i;
-      var sumLat = 0.0;
-      var sumLng = 0.0;
-      var cnt = 0;
-      while (j < points.length) {
-        final d = distanceService.haversineMeters(anchor.coord, points[j].coord);
-        if (d > legacyStayRadiusM) break;
-        sumLat += points[j].coord.lat;
-        sumLng += points[j].coord.lng;
-        cnt++;
-        j++;
+    var index = 0;
+    while (index < ordered.length) {
+      final anchor = ordered[index];
+      var cursor = index;
+      var latitudeSum = 0.0;
+      var longitudeSum = 0.0;
+      var count = 0;
+      while (cursor < ordered.length) {
+        final distance = distanceService.haversineMeters(
+          anchor.coordinate,
+          ordered[cursor].coordinate,
+        );
+        if (distance > legacyStayRadiusM) break;
+        latitudeSum += ordered[cursor].coordinate.lat;
+        longitudeSum += ordered[cursor].coordinate.lng;
+        count++;
+        cursor++;
       }
-      if (cnt >= legacyMinConsecutivePoints) {
-        final start = points[i].at;
-        final end = points[j - 1].at;
+      if (count >= legacyMinConsecutivePoints) {
+        final start = ordered[index].at;
+        final end = ordered[cursor - 1].at;
         final centroid = LatLngE7(
-            (sumLat / cnt * 1e7).round(), (sumLng / cnt * 1e7).round());
+          (latitudeSum / count * 1e7).round(),
+          (longitudeSum / count * 1e7).round(),
+        );
         visits.add(NormalizedVisit(
           sourceKey: sourceKeyGenerator.fingerprint(
             recordType: 'visit',
@@ -472,17 +481,17 @@ class RecordsTimelineParser implements TimelineParser {
           latLng: centroid,
         ));
       }
-      i = j;
+      index = cursor == index ? index + 1 : cursor;
     }
 
-    // 訪問間のギャップを移動として生成
     final records = <NormalizedRecord>[...visits];
-    for (var k = 0; k + 1 < visits.length; k++) {
-      final from = visits[k];
-      final to = visits[k + 1];
-      final distanceM =
+    for (var i = 0; i + 1 < visits.length; i++) {
+      final from = visits[i];
+      final to = visits[i + 1];
+      if (to.startAtUtc.isBefore(from.endAtUtc)) continue;
+      final distance =
           distanceService.haversineMeters(from.latLng, to.latLng).round();
-      if (distanceM <= 5) continue; // ノイズ
+      if (distance <= 5) continue;
       records.add(NormalizedMovement(
         sourceKey: sourceKeyGenerator.fingerprint(
           recordType: 'movement',
@@ -490,11 +499,10 @@ class RecordsTimelineParser implements TimelineParser {
           endAtUtc: to.startAtUtc,
           latE7: from.latLng.latE7,
           lngE7: from.latLng.lngE7,
-          normalizedActivity: null,
         ),
         startAtUtc: from.endAtUtc,
         endAtUtc: to.startAtUtc,
-        distanceM: distanceM,
+        distanceM: distance,
         distanceMethod: DistanceMethod.estimatedDirect,
         startLatLng: from.latLng,
         endLatLng: to.latLng,
@@ -503,70 +511,73 @@ class RecordsTimelineParser implements TimelineParser {
     return records;
   }
 
-  DateTime? _ts(Object? v) {
-    if (v is num) {
-      return DateTime.fromMillisecondsSinceEpoch(v.toInt(), isUtc: true);
+  DateTime? _timestamp(Object? value) {
+    if (value is num) {
+      return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
     }
-    if (v is String) {
-      final ms = int.tryParse(v);
-      if (ms != null) {
-        return DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true);
+    if (value is String) {
+      final milliseconds = int.tryParse(value);
+      if (milliseconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true);
       }
+      return DateTime.tryParse(value)?.toUtc();
     }
-    if (v is Map<String, Object?>) {
-      // 稀に { "timestampMs": ... } の形
-      return _ts(v['timestampMs']);
+    if (value is Map<String, Object?>) {
+      return _timestamp(value['timestampMs'] ?? value['time']);
     }
+    return null;
+  }
+
+  double? _number(Object? value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
     return null;
   }
 }
 
-/// 旧形式の 1 点。
 class _LegacyPoint {
-  const _LegacyPoint({required this.at, required this.coord});
+  const _LegacyPoint({required this.at, required this.coordinate});
 
   final DateTime at;
-  final LatLngE7 coord;
+  final LatLngE7 coordinate;
 
-  static _LegacyPoint? fromMap(Map<String, Object?> m) {
-    final ts = m['timestampMs'];
-    final lat = m['latitudeE7'];
-    final lng = m['longitudeE7'];
-    if (ts is! num && ts is! String) return null;
-    final at = ts is num
-        ? DateTime.fromMillisecondsSinceEpoch(ts.toInt(), isUtc: true)
-        : int.tryParse(ts as String)?.let(
-            (ms) => DateTime.fromMillisecondsSinceEpoch(ms, isUtc: true));
-    if (at == null || lat is! num || lng is! num) return null;
-    return _LegacyPoint(at: at, coord: LatLngE7(lat.toInt(), lng.toInt()));
+  static _LegacyPoint? fromMap(Map<String, Object?> map) {
+    final timestamp = map['timestampMs'];
+    final latitude = map['latitudeE7'];
+    final longitude = map['longitudeE7'];
+    final milliseconds = timestamp is num
+        ? timestamp.toInt()
+        : timestamp is String
+            ? int.tryParse(timestamp)
+            : null;
+    if (milliseconds == null || latitude is! num || longitude is! num) {
+      return null;
+    }
+    return _LegacyPoint(
+      at: DateTime.fromMillisecondsSinceEpoch(milliseconds, isUtc: true),
+      coordinate: LatLngE7(latitude.toInt(), longitude.toInt()),
+    );
   }
 }
 
-extension<T> on T {
-  R? let<R>(R Function(T) f) => f(this);
-}
-
-/// ターゲット配列内の 1 オブジェクトを丸ごと捕捉するコレクタ。
+/// ターゲット配列内の1オブジェクトだけを構築する。
 class _SegmentCollector {
   bool active = false;
-  Map<String, Object?>? completed;
+  Map<String, Object?>? _completed;
 
   final List<Object> _containers = [];
   final List<String?> _keys = [];
-  final List<bool> _isMap = [];
+  final List<bool> _maps = [];
   int _depth = 0;
 
-  void reset() {
-    active = false;
-    completed = null;
-    _containers.clear();
-    _keys.clear();
-    _isMap.clear();
-    _depth = 0;
+  Map<String, Object?>? takeCompleted() {
+    final value = _completed;
+    _completed = null;
+    return value;
   }
 
-  void handle(JsonEvent e) {
-    switch (e.type) {
+  void handle(JsonEvent event) {
+    switch (event.type) {
       case JsonEventType.objectStart:
         _push(<String, Object?>{}, isMap: true);
       case JsonEventType.arrayStart:
@@ -575,27 +586,19 @@ class _SegmentCollector {
       case JsonEventType.arrayEnd:
         _pop();
       case JsonEventType.key:
-        if (_isMap.isNotEmpty && _isMap.last) {
-          _keys[_keys.length - 1] = e.key;
+        if (_maps.isNotEmpty && _maps.last) {
+          _keys[_keys.length - 1] = event.key;
         }
       case JsonEventType.value:
-        _attach(e.value);
+        _attach(event.value);
     }
   }
 
   void _push(Object container, {required bool isMap}) {
-    if (_containers.isNotEmpty) {
-      final parent = _containers.last;
-      if (parent is Map<String, Object?>) {
-        parent[_keys.last ?? ''] = container;
-        _keys[_keys.length - 1] = null;
-      } else {
-        (parent as List<Object?>).add(container);
-      }
-    }
+    if (_containers.isNotEmpty) _attach(container);
     _containers.add(container);
     _keys.add(null);
-    _isMap.add(isMap);
+    _maps.add(isMap);
     _depth++;
     if (_depth == 1) active = true;
   }
@@ -604,22 +607,24 @@ class _SegmentCollector {
     if (_containers.isEmpty) return;
     final removed = _containers.removeLast();
     _keys.removeLast();
-    _isMap.removeLast();
+    _maps.removeLast();
     _depth--;
     if (_depth == 0) {
       active = false;
-      if (removed is Map<String, Object?>) completed = removed;
+      if (removed is Map<String, Object?>) _completed = removed;
     }
   }
 
-  void _attach(Object? v) {
+  void _attach(Object? value) {
     if (_containers.isEmpty) return;
     final top = _containers.last;
     if (top is Map<String, Object?>) {
-      top[_keys.last ?? ''] = v;
+      final key = _keys.last;
+      if (key == null) return;
+      top[key] = value;
       _keys[_keys.length - 1] = null;
     } else {
-      (top as List<Object?>).add(v);
+      (top as List<Object?>).add(value);
     }
   }
 }
