@@ -17,7 +17,13 @@ class MonthStoryScreen extends ConsumerStatefulWidget {
 }
 
 class _MonthStoryScreenState extends ConsumerState<MonthStoryScreen> {
-  late String _month = widget.yearMonth;
+  late String _month;
+
+  @override
+  void initState() {
+    super.initState();
+    _month = widget.yearMonth;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,9 +66,10 @@ class _MonthStoryScreenState extends ConsumerState<MonthStoryScreen> {
 }
 
 final _monthStoryProvider =
-    FutureProvider.autoDispose.family<MonthStoryData, String>(
-  (ref, month) => ref.watch(dashboardUseCaseProvider).monthStory(month),
-);
+    FutureProvider.autoDispose.family<MonthStoryData, String>((ref, month) {
+  ref.watch(dashboardRefreshProvider);
+  return ref.watch(dashboardUseCaseProvider).monthStory(month);
+});
 
 class _StoryBody extends StatelessWidget {
   const _StoryBody({required this.data});
@@ -86,9 +93,11 @@ class _StoryBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(monthLabel,
-            style:
-                theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+        Text(
+          monthLabel,
+          style: theme.textTheme.headlineSmall
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
         const SizedBox(height: 4),
         Text(
           'この月の生活のまとめです。',
@@ -96,36 +105,45 @@ class _StoryBody extends StatelessWidget {
               ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 16),
-
-        // 主要指標
         Wrap(
           spacing: 12,
           runSpacing: 12,
           children: [
-            _pill(theme, '外出日数', '${monthly.outingDays}日',
-                _delta(prev?.outingDays, monthly.outingDays)),
-            _pill(theme, '移動距離', _km(monthly.distanceM),
-                _deltaPercent(prev?.distanceM, monthly.distanceM)),
-            _pill(theme, '訪れた地点', '${monthly.uniqueClusters}か所',
-                _delta(prev?.uniqueClusters, monthly.uniqueClusters)),
+            _pill(
+              theme,
+              '外出日数',
+              '${monthly.outingDays}日',
+              _delta(prev?.outingDays, monthly.outingDays),
+            ),
+            _pill(
+              theme,
+              '移動距離',
+              _km(monthly.distanceM),
+              _deltaPercent(prev?.distanceM, monthly.distanceM),
+            ),
+            _pill(
+              theme,
+              '訪れた地点',
+              '${monthly.uniqueClusters}か所',
+              _delta(prev?.uniqueClusters, monthly.uniqueClusters),
+            ),
             _pill(theme, '新規地点', '${monthly.newClusters}か所', null),
           ],
         ),
-
         const SizedBox(height: 16),
-
-        // 最大移動日
         if (monthly.maxDistanceDate != null)
           Card(
             child: ListTile(
-              leading: Icon(Icons.local_fire_department,
-                  color: theme.colorScheme.tertiary),
+              leading: Icon(
+                Icons.local_fire_department,
+                color: theme.colorScheme.tertiary,
+              ),
               title: const Text('最大移動日'),
-              subtitle: Text('${_formatDate(monthly.maxDistanceDate!)} に最も移動しました'),
+              subtitle: Text(
+                '${_formatDate(monthly.maxDistanceDate!)} に最も移動しました',
+              ),
             ),
           ),
-
-        // 新規地点
         if (data.newClusterNames.isNotEmpty) ...[
           const SizedBox(height: 8),
           Card(
@@ -153,10 +171,7 @@ class _StoryBody extends StatelessWidget {
             ),
           ),
         ],
-
         const SizedBox(height: 16),
-
-        // 変化一覧（インサイト最大 8 件）
         if (data.insights.isNotEmpty) ...[
           Text('この月の変化', style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -186,16 +201,22 @@ class _StoryBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: scheme.onPrimaryContainer)),
-          Text(value,
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(color: scheme.onPrimaryContainer)),
+          Text(
+            label,
+            style: theme.textTheme.labelMedium
+                ?.copyWith(color: scheme.onPrimaryContainer),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: scheme.onPrimaryContainer),
+          ),
           if (delta != null)
-            Text(delta,
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: scheme.onPrimaryContainer)),
+            Text(
+              delta,
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: scheme.onPrimaryContainer),
+            ),
         ],
       ),
     );
