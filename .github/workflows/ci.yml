@@ -23,7 +23,10 @@ jobs:
           cache: true
 
       - name: Restore missing Flutter wrapper files
-        run: flutter create --platforms=android --project-name kurashilog .
+        shell: bash
+        run: |
+          flutter create --platforms=android --project-name kurashilog .
+          rm -f test/widget_test.dart
 
       - name: Resolve dependencies
         run: flutter pub get
