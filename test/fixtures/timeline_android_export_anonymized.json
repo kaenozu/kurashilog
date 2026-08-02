@@ -1,0 +1,101 @@
+{
+  "semanticSegments": [
+    {
+      "startTime": "2026-07-20T00:00:00+09:00",
+      "endTime": "2026-07-20T01:00:00+09:00",
+      "timelinePath": [
+        {
+          "point": "35.666379\u00b0, 139.7583398\u00b0",
+          "time": "2026-07-20T00:10:00+09:00"
+        },
+        {
+          "point": "35.6710524\u00b0, 139.760172\u00b0",
+          "time": "2026-07-20T00:30:00+09:00"
+        },
+        {
+          "point": "35.6790000\u00b0, 139.7650000\u00b0",
+          "time": "2026-07-20T00:50:00+09:00"
+        }
+      ]
+    },
+    {
+      "startTime": "2026-07-20T01:00:00+09:00",
+      "endTime": "2026-07-20T02:00:00+09:00",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-PARK",
+          "semanticType": "UNKNOWN",
+          "placeLocation": {
+            "latLng": "35.666379\u00b0, 139.7583398\u00b0"
+          },
+          "probability": 0.41353073716163635
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-20T02:00:00+09:00",
+      "endTime": "2026-07-20T03:00:00+09:00",
+      "activity": {
+        "start": {
+          "latLng": "35.666379\u00b0, 139.7583398\u00b0"
+        },
+        "end": {
+          "latLng": "35.697308\u00b0, 139.786073\u00b0"
+        },
+        "topCandidate": {
+          "type": "IN_VEHICLE",
+          "probability": 0.9
+        },
+        "distanceMeters": 24507.0
+      }
+    },
+    {
+      "startTime": "2026-07-20T03:00:00+09:00",
+      "endTime": "2026-07-20T04:00:00+09:00",
+      "activity": {
+        "start": {
+          "latLng": "35.697308\u00b0, 139.786073\u00b0"
+        },
+        "end": {
+          "latLng": "35.697525\u00b0, 139.832455\u00b0"
+        },
+        "topCandidate": {
+          "type": "UNKNOWN_ACTIVITY_TYPE",
+          "probability": 0.5
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-20T04:00:00+09:00",
+      "endTime": "2026-07-20T05:00:00+09:00",
+      "visit": {
+        "topCandidate": {
+          "placeId": "ANON-PLACE-HOME",
+          "semanticType": "UNKNOWN",
+          "placeLocation": {
+            "latLng": "35.697308\u00b0, 139.786073\u00b0"
+          },
+          "probability": 0.8
+        }
+      }
+    },
+    {
+      "startTime": "2026-07-20T05:00:00+09:00",
+      "endTime": "2026-07-20T05:30:00+09:00",
+      "timelinePath": [
+        {
+          "point": "35.7000000\u00b0, 139.7900000\u00b0",
+          "time": "2026-07-20T05:10:00+09:00"
+        }
+      ]
+    },
+    {
+      "startTime": "2026-07-20T06:00:00+09:00",
+      "endTime": "2026-07-20T06:30:00+09:00",
+      "timelineMemory": {
+        "title": "ANON-MEMORY",
+        "humanReadableAddress": "ANON-ADDRESS"
+      }
+    }
+  ]
+}
