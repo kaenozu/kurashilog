@@ -1,7 +1,4 @@
 /// アプリケーション層で使う永続化データ型（Drift 非依存）。
-///
-/// Domain 層の純粋性を保つため、リポジトリ境界ではこれらの型をやりとりし、
-/// 実装（Infrastructure）側で Drift 行へ変換する。
 library;
 
 import '../../domain/models/distance_method.dart';
@@ -63,9 +60,6 @@ class StoredMovement {
   final LatLngE7? startLatLng;
   final LatLngE7? endLatLng;
   final List<LatLngE7> path;
-
-  /// 異常速度などで日常移動集計から除外するか（設計書 6.2）。
-  /// 距離自体は保持し、総移動には含められる。
   final bool validDistance;
 }
 
@@ -111,7 +105,8 @@ class StoredCluster {
 
   static String _letterFor(int id) {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    return letters[(id - 1).clamp(0, letters.length - 1)];
+    final index = (id - 1).clamp(0, letters.length - 1).toInt();
+    return letters[index];
   }
 }
 
@@ -191,7 +186,7 @@ class ImportedFileRecord {
   final DateTime? completedAt;
   final DateTime? sourceMinAt;
   final DateTime? sourceMaxAt;
-  final String status; // processing | completed | failed | cancelled
+  final String status;
   final int warningCount;
   final int addedVisits;
   final int addedMovements;
@@ -199,6 +194,5 @@ class ImportedFileRecord {
   bool get isCompleted => status == 'completed';
 }
 
-/// 日次・月次サマリーの保存用レコード（ドメインモデルをそのまま使用）。
 typedef DailySummaryRecord = DailySummaryData;
 typedef MonthlySummaryRecord = MonthlySummaryData;
