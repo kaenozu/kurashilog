@@ -54,6 +54,9 @@ class _RootGateState extends ConsumerState<_RootGate>
     if (state == AppLifecycleState.resumed) {
       _checkSharedFile();
     }
+    if (state == AppLifecycleState.detached) {
+      ref.read(appDatabaseProvider).close();
+    }
   }
 
   Future<void> _checkSharedFile() async {
