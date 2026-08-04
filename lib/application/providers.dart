@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../infrastructure/database/app_database.dart';
-import '../infrastructure/database/correction_preserving_repository.dart';
+import '../infrastructure/database/kurashilog_repository_impl.dart';
 import '../infrastructure/parsers/record_validator.dart';
 import '../infrastructure/parsers/records_parser.dart';
 import '../infrastructure/platform/app_platform.dart';
@@ -20,7 +20,7 @@ final appDatabaseProvider = Provider<AppDatabase>(
 );
 
 final repositoryProvider = Provider<KurashilogRepository>(
-  (ref) => CorrectionPreservingRepository(ref.watch(appDatabaseProvider)),
+  (ref) => KurashilogRepositoryImpl(ref.watch(appDatabaseProvider)),
 );
 
 final platformProvider = Provider<AppPlatform>((ref) => AppPlatform());
