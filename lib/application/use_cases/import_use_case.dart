@@ -70,6 +70,27 @@ class ImportResult {
   final String? errorMessage;
 }
 
+/// Merges preview and full-validation warnings without counting the same
+/// code/message twice. Full validation can be more precise, so the larger
+/// count is retained for a duplicate warning.
+List<ImportWarning> mergeImportWarnings(
+  Iterable<ImportWarning> previewWarnings,
+  Iterable<ImportWarning> validationWarnings,
+) {
+  final merged = <String, ImportWarning>{};
+  for (final warning in [...previewWarnings, ...validationWarnings]) {
+    final key = '${warning.code}\u0000${warning.message}';
+    final current = merged[key];
+    if (current == null || warning.count > current.count) {
+      merged[key] = warning;
+    }
+  }
+  return List.unmodifiable(merged.values);
+}
+
+int importWarningCount(Iterable<ImportWarning> warnings) =>
+    warnings.fold(0, (sum, warning) => sum + warning.count);
+
 class ImportUseCase {
   const ImportUseCase({
     required this.repository,
@@ -145,10 +166,12 @@ class ImportUseCase {
   Future<ImportResult> importFile(
     String path, {
     CancellationToken? token,
+    List<ImportWarning> previewWarnings = const [],
     void Function(ImportProgress progress)? onProgress,
   }) async {
     final cancellation = token ?? CancellationToken();
     final file = File(path);
+    var warnings = List<ImportWarning>.unmodifiable(previewWarnings);
     onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 5));
 
     final String fileHash;
@@ -186,6 +209,7 @@ class ImportUseCase {
       onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 10));
       final records = parser.parse(file.openRead(), cancellation);
       final validated = await validator.validate(records, cancellation);
+      warnings = mergeImportWarnings(previewWarnings, validated.warnings);
       onProgress?.call(
         const ImportProgress(ImportStage.validating, percent: 40),
       );
@@ -196,10 +220,11 @@ class ImportUseCase {
           fileHash: fileHash,
           startedAt: startedAt,
           status: 'cancelled',
-          warningCount: validated.warnings.length,
+          warningCount: importWarningCount(warnings),
         );
-        return const ImportResult(
+        return ImportResult(
           ok: false,
+          warnings: warnings,
           errorCode: 'IMP-005',
           errorMessage: 'キャンセルされました',
         );
@@ -227,6 +252,12 @@ class ImportUseCase {
         );
         await analysis.rebuildAll();
 
+        // Analysis may run in an isolate. A cancellation requested while that
+        // work is running must still roll back this entire import transaction.
+        if (cancellation.isCancelled) {
+          throw const ImportParseException('IMP-005', 'キャンセルされました');
+        }
+
         onProgress?.call(
           const ImportProgress(ImportStage.insights, percent: 95),
         );
@@ -240,7 +271,7 @@ class ImportUseCase {
             sourceMinAt: sourceMinAt,
             sourceMaxAt: sourceMaxAt,
             status: 'completed',
-            warningCount: validated.warnings.length,
+            warningCount: importWarningCount(warnings),
             addedVisits: diff.addedVisits,
             addedMovements: diff.addedMovements,
           ),
@@ -256,7 +287,7 @@ class ImportUseCase {
         addedMovements: diff.addedMovements,
         sourceMinAt: sourceMinAt,
         sourceMaxAt: sourceMaxAt,
-        warnings: validated.warnings,
+        warnings: warnings,
       );
     } on ImportParseException catch (error) {
       await _recordTerminalState(
@@ -264,9 +295,11 @@ class ImportUseCase {
         fileHash: fileHash,
         startedAt: startedAt,
         status: error.code == 'IMP-005' ? 'cancelled' : 'failed',
+        warningCount: importWarningCount(warnings),
       );
       return ImportResult(
         ok: false,
+        warnings: warnings,
         errorCode: error.code,
         errorMessage: error.message,
       );
@@ -276,9 +309,11 @@ class ImportUseCase {
         fileHash: fileHash,
         startedAt: startedAt,
         status: 'failed',
+        warningCount: importWarningCount(warnings),
       );
-      return const ImportResult(
+      return ImportResult(
         ok: false,
+        warnings: warnings,
         errorCode: 'IMP-001',
         errorMessage: 'ファイルを読み取れませんでした',
       );
@@ -288,9 +323,11 @@ class ImportUseCase {
         fileHash: fileHash,
         startedAt: startedAt,
         status: 'failed',
+        warningCount: importWarningCount(warnings),
       );
-      return const ImportResult(
+      return ImportResult(
         ok: false,
+        warnings: warnings,
         errorCode: 'IMP-004',
         errorMessage: 'データベースの更新に失敗しました',
       );
