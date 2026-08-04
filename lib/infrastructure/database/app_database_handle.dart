@@ -18,15 +18,12 @@ class DatabaseResetException implements Exception {
 
 /// Serializes database access and owns crash-recoverable physical resets.
 class AppDatabaseHandle {
-  AppDatabaseHandle._({
-    required String databasePath,
-    required DatabaseOpener opener,
-    required DatabaseFileDeleter deleteFile,
-    required AppDatabase database,
-  }) : _databasePath = databasePath,
-       _opener = opener,
-       _deleteFile = deleteFile,
-       _database = database;
+  AppDatabaseHandle._(
+    this._databasePath,
+    this._opener,
+    this._deleteFile,
+    this._database,
+  );
 
   static const String resetMarkerSuffix = '.reset-pending';
   static const String stagedSuffix = '.resetting';
@@ -50,16 +47,13 @@ class AppDatabaseHandle {
     final resolvedOpener = opener ?? AppDatabase.openAtPath;
     final resolvedDeleteFile = deleteFile ?? _deleteIfPresent;
 
-    await _completePendingReset(
-      resolvedPath,
-      deleteFile: resolvedDeleteFile,
-    );
+    await _completePendingReset(resolvedPath, deleteFile: resolvedDeleteFile);
     final database = await resolvedOpener(resolvedPath);
     return AppDatabaseHandle._(
-      databasePath: resolvedPath,
-      opener: resolvedOpener,
-      deleteFile: resolvedDeleteFile,
-      database: database,
+      resolvedPath,
+      resolvedOpener,
+      resolvedDeleteFile,
+      database,
     );
   }
 
@@ -86,10 +80,7 @@ class AppDatabaseHandle {
         await _database.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
         await _database.close();
         databaseClosed = true;
-        await _completePendingReset(
-          _databasePath,
-          deleteFile: _deleteFile,
-        );
+        await _completePendingReset(_databasePath, deleteFile: _deleteFile);
       } catch (error, stackTrace) {
         originalError = error;
         originalStackTrace = stackTrace;
@@ -98,16 +89,10 @@ class AppDatabaseHandle {
             await _database.close();
             databaseClosed = true;
           }
-          await _completePendingReset(
-            _databasePath,
-            deleteFile: _deleteFile,
-          );
+          await _completePendingReset(_databasePath, deleteFile: _deleteFile);
         } catch (recoveryError) {
           _closed = true;
-          throw DatabaseResetException(
-            'データベースの物理削除と復旧に失敗しました',
-            recoveryError,
-          );
+          throw DatabaseResetException('データベースの物理削除と復旧に失敗しました', recoveryError);
         }
       }
 
@@ -115,10 +100,7 @@ class AppDatabaseHandle {
         _database = await _opener(_databasePath);
       } catch (reopenError) {
         _closed = true;
-        throw DatabaseResetException(
-          'データベース削除後の再初期化に失敗しました',
-          reopenError,
-        );
+        throw DatabaseResetException('データベース削除後の再初期化に失敗しました', reopenError);
       }
 
       if (originalError != null) {
@@ -140,10 +122,7 @@ class AppDatabaseHandle {
 
   Future<T> _enqueue<T>(Future<T> Function() action) {
     final result = _tail.then((_) => action());
-    _tail = result.then<void>(
-      (_) {},
-      onError: (Object _, StackTrace _) {},
-    );
+    _tail = result.then<void>((_) {}, onError: (Object _, StackTrace _) {});
     return result;
   }
 
