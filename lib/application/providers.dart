@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../infrastructure/database/app_database.dart';
-import '../infrastructure/database/kurashilog_repository_impl.dart';
+import '../infrastructure/database/app_database_handle.dart';
+import '../infrastructure/database/resettable_kurashilog_repository.dart';
 import '../infrastructure/parsers/record_validator.dart';
 import '../infrastructure/parsers/records_parser.dart';
 import '../infrastructure/platform/app_platform.dart';
@@ -14,13 +14,13 @@ import 'use_cases/import_use_case.dart';
 import 'use_cases/places_use_case.dart';
 import 'use_cases/settings_use_case.dart';
 
-/// 起動時に main() で override する。
-final appDatabaseProvider = Provider<AppDatabase>(
+/// 起動時にmain()でoverrideする。
+final appDatabaseHandleProvider = Provider<AppDatabaseHandle>(
   (ref) => throw UnimplementedError('main() で override してください'),
 );
 
 final repositoryProvider = Provider<KurashilogRepository>(
-  (ref) => KurashilogRepositoryImpl(ref.watch(appDatabaseProvider)),
+  (ref) => ResettableKurashilogRepository(ref.watch(appDatabaseHandleProvider)),
 );
 
 final platformProvider = Provider<AppPlatform>((ref) => AppPlatform());

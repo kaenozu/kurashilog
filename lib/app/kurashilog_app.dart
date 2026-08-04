@@ -55,7 +55,7 @@ class _RootGateState extends ConsumerState<_RootGate>
       _checkSharedFile();
     }
     if (state == AppLifecycleState.detached) {
-      ref.read(appDatabaseProvider).close();
+      ref.read(appDatabaseHandleProvider).close();
     }
   }
 
