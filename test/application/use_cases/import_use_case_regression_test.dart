@@ -10,6 +10,7 @@ import 'package:kurashilog/domain/models/normalized_record.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
 import 'package:kurashilog/infrastructure/database/kurashilog_repository_impl.dart';
 import 'package:kurashilog/infrastructure/parsers/record_validator.dart';
+import 'package:kurashilog/infrastructure/parsers/records_parser.dart';
 import 'package:kurashilog/infrastructure/parsers/timeline_parser.dart';
 import 'package:kurashilog/infrastructure/platform/app_platform.dart';
 
@@ -86,10 +87,7 @@ void main() {
 }
 
 class _CancellingAnalysis extends AnalysisCoordinator {
-  _CancellingAnalysis({
-    required KurashilogRepository repository,
-    required this.token,
-  }) : super(repository: repository);
+  _CancellingAnalysis({required super.repository, required this.token});
 
   final CancellationToken token;
 
@@ -99,7 +97,7 @@ class _CancellingAnalysis extends AnalysisCoordinator {
   }
 }
 
-class _EmptyParser implements TimelineParser {
+class _EmptyParser extends RecordsTimelineParser {
   const _EmptyParser();
 
   @override
