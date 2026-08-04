@@ -26,14 +26,19 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Restore missing Flutter wrapper files
-        shell: bash
-        run: |
-          flutter create --platforms=android --project-name kurashilog .
-          rm -f test/widget_test.dart
-
       - name: Resolve dependencies
         run: flutter pub get
+
+      - name: Assert dependency resolution kept tracked sources clean
+        shell: bash
+        run: |
+          changes="$(git status --porcelain --untracked-files=no)"
+          if [[ -n "${changes}" ]]; then
+            echo "Dependency resolution changed tracked checkout files:"
+            printf '%s\n' "${changes}"
+            git diff -- .
+            exit 1
+          fi
 
       - name: Check formatting
         run: dart format --output=none --set-exit-if-changed lib test
@@ -57,5 +62,16 @@ jobs:
           test -n "$manifest"
           if grep -q 'android.permission.INTERNET' "$manifest"; then
             echo "Release manifest unexpectedly contains INTERNET permission: $manifest"
+            exit 1
+          fi
+
+      - name: Assert validation kept tracked sources clean
+        shell: bash
+        run: |
+          changes="$(git status --porcelain --untracked-files=no)"
+          if [[ -n "${changes}" ]]; then
+            echo "Validation changed tracked checkout files:"
+            printf '%s\n' "${changes}"
+            git diff -- .
             exit 1
           fi
