@@ -166,8 +166,21 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (confirmed != true) return;
 
-    await ref.read(dataManagementUseCaseProvider).deleteAllUserData();
+    try {
+      await ref.read(dataManagementUseCaseProvider).deleteAllUserData();
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('データを完全に削除できませんでした。もう一度お試しください。'),
+          ),
+        );
+      }
+      return;
+    }
+
     ref.read(dashboardRefreshProvider.notifier).state++;
+    ref.invalidate(_settingsProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
