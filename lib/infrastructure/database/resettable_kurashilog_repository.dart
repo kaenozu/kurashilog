@@ -56,8 +56,7 @@ class ResettableKurashilogRepository implements KurashilogRepository {
       _run((repository) => repository.updateImport(record));
 
   @override
-  Future<int> countVisits() =>
-      _run((repository) => repository.countVisits());
+  Future<int> countVisits() => _run((repository) => repository.countVisits());
 
   @override
   Future<int> countMovements() =>
@@ -72,20 +71,14 @@ class ResettableKurashilogRepository implements KurashilogRepository {
       _run((repository) => repository.earliestActivityAt());
 
   @override
-  Future<List<StoredVisit>> visitsInRange(
-    DateTime startUtc,
-    DateTime endUtc,
-  ) => _run(
-    (repository) => repository.visitsInRange(startUtc, endUtc),
-  );
+  Future<List<StoredVisit>> visitsInRange(DateTime startUtc, DateTime endUtc) =>
+      _run((repository) => repository.visitsInRange(startUtc, endUtc));
 
   @override
   Future<List<StoredMovement>> movementsInRange(
     DateTime startUtc,
     DateTime endUtc,
-  ) => _run(
-    (repository) => repository.movementsInRange(startUtc, endUtc),
-  );
+  ) => _run((repository) => repository.movementsInRange(startUtc, endUtc));
 
   @override
   Future<List<StoredVisit>> allVisits() =>
@@ -100,17 +93,14 @@ class ResettableKurashilogRepository implements KurashilogRepository {
     required List<StoredVisit> visits,
     required List<StoredMovement> movements,
   }) => _run(
-    (repository) => repository.insertNewRecords(
-      visits: visits,
-      movements: movements,
-    ),
+    (repository) =>
+        repository.insertNewRecords(visits: visits, movements: movements),
   );
 
   @override
-  Future<void> assignVisitClusterIds(Map<int, int> clusterIdByVisitId) =>
-      _run(
-        (repository) => repository.assignVisitClusterIds(clusterIdByVisitId),
-      );
+  Future<void> assignVisitClusterIds(Map<int, int> clusterIdByVisitId) => _run(
+    (repository) => repository.assignVisitClusterIds(clusterIdByVisitId),
+  );
 
   @override
   Future<void> replaceAllClusters(List<StoredCluster> clusters) =>
@@ -126,15 +116,11 @@ class ResettableKurashilogRepository implements KurashilogRepository {
 
   @override
   Future<void> updateClusterLabel(int clusterId, int? labelId) =>
-      _run(
-        (repository) => repository.updateClusterLabel(clusterId, labelId),
-      );
+      _run((repository) => repository.updateClusterLabel(clusterId, labelId));
 
   @override
   Future<void> setClusterExcluded(int clusterId, bool excluded) =>
-      _run(
-        (repository) => repository.setClusterExcluded(clusterId, excluded),
-      );
+      _run((repository) => repository.setClusterExcluded(clusterId, excluded));
 
   @override
   Future<int> insertLabel(StoredLabel label) =>
