@@ -10,9 +10,7 @@ Future<void> main() async {
   final databaseHandle = await AppDatabaseHandle.open();
   runApp(
     ProviderScope(
-      overrides: [
-        appDatabaseHandleProvider.overrideWithValue(databaseHandle),
-      ],
+      overrides: [appDatabaseHandleProvider.overrideWithValue(databaseHandle)],
       child: const KurashilogApp(),
     ),
   );
