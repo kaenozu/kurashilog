@@ -4,7 +4,6 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/application/analysis/analysis_coordinator.dart';
 import 'package:kurashilog/application/models/persistence_models.dart';
-import 'package:kurashilog/application/repositories/kurashilog_repository.dart';
 import 'package:kurashilog/application/use_cases/import_use_case.dart';
 import 'package:kurashilog/domain/models/normalized_record.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
