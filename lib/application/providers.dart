@@ -20,9 +20,7 @@ final appDatabaseHandleProvider = Provider<AppDatabaseHandle>(
 );
 
 final repositoryProvider = Provider<KurashilogRepository>(
-  (ref) => ResettableKurashilogRepository(
-    ref.watch(appDatabaseHandleProvider),
-  ),
+  (ref) => ResettableKurashilogRepository(ref.watch(appDatabaseHandleProvider)),
 );
 
 final platformProvider = Provider<AppPlatform>((ref) => AppPlatform());
