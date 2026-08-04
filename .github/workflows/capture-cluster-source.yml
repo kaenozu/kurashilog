@@ -1,6 +1,7 @@
 name: Capture cluster review source
 
 on:
+  pull_request:
   push:
     branches:
       - agent/1-cluster-one-to-one-20260804
