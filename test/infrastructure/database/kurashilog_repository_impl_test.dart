@@ -153,6 +153,141 @@ void main() {
     expect(rebuilt.excluded, isFalse);
   });
 
+  test('cluster split does not duplicate one correction', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final labelId = await repository.insertLabel(
+      StoredLabel(
+        id: 0,
+        displayName: '自宅',
+        isBasePlace: true,
+        createdAt: at,
+        updatedAt: at,
+      ),
+    );
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812360, stableKey: 'old-home'),
+    ]);
+    final existing = (await repository.allClusters()).single;
+    await repository.updateClusterLabel(existing.id, labelId);
+    await repository.setClusterExcluded(existing.id, true);
+
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812365, stableKey: 'split-near'),
+      _cluster(at, centroidLatE7: 356812380, stableKey: 'split-far'),
+    ]);
+
+    final rebuilt = await repository.allClusters();
+    final corrected = rebuilt.where((cluster) => cluster.labelId == labelId);
+    expect(corrected, hasLength(1));
+    expect(corrected.single.stableKey, 'split-near');
+    expect(corrected.single.excluded, isTrue);
+    expect(rebuilt.where((cluster) => cluster.isBasePlace), hasLength(1));
+    final uncorrected = rebuilt.singleWhere(
+      (cluster) => cluster.stableKey == 'split-far',
+    );
+    expect(uncorrected.labelId, isNull);
+    expect(uncorrected.excluded, isFalse);
+  });
+
+  test('stable key match wins before a closer distance match', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final exactLabelId = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: '完全一致', createdAt: at, updatedAt: at),
+    );
+    final nearbyLabelId = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: '近傍', createdAt: at, updatedAt: at),
+    );
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812300, stableKey: 'exact-key'),
+      _cluster(at, centroidLatE7: 356812400, stableKey: 'near-key'),
+    ]);
+    final existing = await repository.allClusters();
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'exact-key').id,
+      exactLabelId,
+    );
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'near-key').id,
+      nearbyLabelId,
+    );
+
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812399, stableKey: 'exact-key'),
+      _cluster(at, centroidLatE7: 356812401, stableKey: 'new-near'),
+    ]);
+
+    final rebuilt = await repository.allClusters();
+    expect(
+      rebuilt
+          .singleWhere((cluster) => cluster.stableKey == 'exact-key')
+          .labelId,
+      exactLabelId,
+    );
+    expect(
+      rebuilt.singleWhere((cluster) => cluster.stableKey == 'new-near').labelId,
+      nearbyLabelId,
+    );
+  });
+
+  test('cluster merge inherits only the closest correction', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final closeLabelId = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: '近い地点', createdAt: at, updatedAt: at),
+    );
+    final farLabelId = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: '遠い地点', createdAt: at, updatedAt: at),
+    );
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812360, stableKey: 'old-close'),
+      _cluster(at, centroidLatE7: 356812500, stableKey: 'old-far'),
+    ]);
+    final existing = await repository.allClusters();
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'old-close').id,
+      closeLabelId,
+    );
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'old-far').id,
+      farLabelId,
+    );
+
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812370, stableKey: 'merged'),
+    ]);
+
+    final rebuilt = (await repository.allClusters()).single;
+    expect(rebuilt.labelId, closeLabelId);
+  });
+
+  test('equal-distance matching is deterministic by stable key', () async {
+    final at = DateTime.utc(2026, 7, 1);
+    final labelA = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: 'A', createdAt: at, updatedAt: at),
+    );
+    final labelB = await repository.insertLabel(
+      StoredLabel(id: 0, displayName: 'B', createdAt: at, updatedAt: at),
+    );
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812350, stableKey: 'a-existing'),
+      _cluster(at, centroidLatE7: 356812370, stableKey: 'b-existing'),
+    ]);
+    final existing = await repository.allClusters();
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'a-existing').id,
+      labelA,
+    );
+    await repository.updateClusterLabel(
+      existing.singleWhere((cluster) => cluster.stableKey == 'b-existing').id,
+      labelB,
+    );
+
+    await repository.replaceAllClusters([
+      _cluster(at, centroidLatE7: 356812360, stableKey: 'new-cluster'),
+    ]);
+
+    expect((await repository.allClusters()).single.labelId, labelA);
+  });
+
   test('runInTransaction rolls raw records back on failure', () async {
     final at = DateTime.utc(2026, 7, 1);
     await expectLater(

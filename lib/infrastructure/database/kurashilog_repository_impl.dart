@@ -9,6 +9,18 @@ import '../../domain/services/clustering_service.dart';
 import '../../domain/services/distance_service.dart';
 import 'app_database.dart';
 
+class _ClusterMatchCandidate {
+  const _ClusterMatchCandidate({
+    required this.clusterIndex,
+    required this.existing,
+    required this.distanceM,
+  });
+
+  final int clusterIndex;
+  final PlaceClusterRow existing;
+  final double distanceM;
+}
+
 class KurashilogRepositoryImpl implements KurashilogRepository {
   KurashilogRepositoryImpl(this._db);
 
@@ -173,64 +185,103 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   Future<void> replaceAllClusters(List<StoredCluster> clusters) {
     return _db.transaction(() async {
       final existingRows = await _db.select(_db.placeClusters).get();
-      final existingByKey = {
-        for (final row in existingRows) row.stableKey: row,
-      };
+      final matches = _matchExistingClusters(existingRows, clusters);
 
       await _db.delete(_db.placeClusters).go();
       if (clusters.isEmpty) return;
 
-      final rows = clusters.map((cluster) {
-        var existing = existingByKey[cluster.stableKey];
-        existing ??= _nearestExisting(existingRows, cluster);
-        return _clusterToDb(
-          StoredCluster(
-            id: cluster.id,
-            stableKey: cluster.stableKey,
-            centroidLatE7: cluster.centroidLatE7,
-            centroidLngE7: cluster.centroidLngE7,
-            radiusM: cluster.radiusM,
-            visitCount: cluster.visitCount,
-            dwellSeconds: cluster.dwellSeconds,
-            firstAt: cluster.firstAt,
-            lastAt: cluster.lastAt,
-            labelId: existing?.labelId,
-            excluded: existing?.excluded ?? false,
+      final rows = <PlaceClustersCompanion>[];
+      for (var index = 0; index < clusters.length; index++) {
+        final cluster = clusters[index];
+        final existing = matches[index];
+        rows.add(
+          _clusterToDb(
+            StoredCluster(
+              id: cluster.id,
+              stableKey: cluster.stableKey,
+              centroidLatE7: cluster.centroidLatE7,
+              centroidLngE7: cluster.centroidLngE7,
+              radiusM: cluster.radiusM,
+              visitCount: cluster.visitCount,
+              dwellSeconds: cluster.dwellSeconds,
+              firstAt: cluster.firstAt,
+              lastAt: cluster.lastAt,
+              labelId: existing?.labelId,
+              excluded: existing?.excluded ?? false,
+            ),
           ),
         );
-      }).toList();
+      }
       await _db.batch((batch) => batch.insertAll(_db.placeClusters, rows));
     });
   }
 
-  /// stableKey が変わったクラスタでも、既存クラスタ重心との距離が
-  /// クラスタ統合距離（maxMergeDistanceM）以内の最寄りから
-  /// ラベル・分析除外設定を引き継ぐ。
-  PlaceClusterRow? _nearestExisting(
+  /// Existing user corrections are transferred one-to-one. Exact stable-key
+  /// matches win first; remaining clusters compete for nearby existing rows by
+  /// distance. Once an existing row is consumed it cannot be copied to a second
+  /// cluster after a split.
+  List<PlaceClusterRow?> _matchExistingClusters(
     List<PlaceClusterRow> existingRows,
-    StoredCluster cluster,
+    List<StoredCluster> clusters,
   ) {
-    if (existingRows.isEmpty) return null;
-    final distance = const DistanceService();
-    final maxMatchM = const ClusteringService().maxMergeDistanceM;
-    final candidate = LatLngE7(cluster.centroidLatE7, cluster.centroidLngE7);
+    final matches = List<PlaceClusterRow?>.filled(clusters.length, null);
+    if (existingRows.isEmpty || clusters.isEmpty) return matches;
 
-    var best = existingRows.first;
-    var bestDistance = distance.haversineMeters(
-      candidate,
-      LatLngE7(best.centroidLatE7, best.centroidLngE7),
-    );
-    for (final row in existingRows.skip(1)) {
-      final candidateDistance = distance.haversineMeters(
-        candidate,
-        LatLngE7(row.centroidLatE7, row.centroidLngE7),
-      );
-      if (candidateDistance < bestDistance) {
-        best = row;
-        bestDistance = candidateDistance;
+    final existingByKey = {for (final row in existingRows) row.stableKey: row};
+    final consumedExistingIds = <int>{};
+
+    for (var index = 0; index < clusters.length; index++) {
+      final exact = existingByKey[clusters[index].stableKey];
+      if (exact != null && consumedExistingIds.add(exact.id)) {
+        matches[index] = exact;
       }
     }
-    return bestDistance <= maxMatchM ? best : null;
+
+    final distance = const DistanceService();
+    final maxMatchM = const ClusteringService().maxMergeDistanceM;
+    final candidates = <_ClusterMatchCandidate>[];
+    for (var index = 0; index < clusters.length; index++) {
+      if (matches[index] != null) continue;
+      final cluster = clusters[index];
+      final centroid = LatLngE7(cluster.centroidLatE7, cluster.centroidLngE7);
+      for (final existing in existingRows) {
+        if (consumedExistingIds.contains(existing.id)) continue;
+        final distanceM = distance.haversineMeters(
+          centroid,
+          LatLngE7(existing.centroidLatE7, existing.centroidLngE7),
+        );
+        if (distanceM <= maxMatchM) {
+          candidates.add(
+            _ClusterMatchCandidate(
+              clusterIndex: index,
+              existing: existing,
+              distanceM: distanceM,
+            ),
+          );
+        }
+      }
+    }
+
+    candidates.sort((left, right) {
+      final byDistance = left.distanceM.compareTo(right.distanceM);
+      if (byDistance != 0) return byDistance;
+      final byNewKey = clusters[left.clusterIndex].stableKey.compareTo(
+        clusters[right.clusterIndex].stableKey,
+      );
+      if (byNewKey != 0) return byNewKey;
+      final byExistingKey = left.existing.stableKey.compareTo(
+        right.existing.stableKey,
+      );
+      if (byExistingKey != 0) return byExistingKey;
+      return left.existing.id.compareTo(right.existing.id);
+    });
+
+    for (final candidate in candidates) {
+      if (matches[candidate.clusterIndex] != null) continue;
+      if (!consumedExistingIds.add(candidate.existing.id)) continue;
+      matches[candidate.clusterIndex] = candidate.existing;
+    }
+    return matches;
   }
 
   @override
