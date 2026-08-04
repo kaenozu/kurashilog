@@ -171,9 +171,7 @@ class SettingsScreen extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('データを完全に削除できませんでした。もう一度お試しください。'),
-          ),
+          const SnackBar(content: Text('データを完全に削除できませんでした。もう一度お試しください。')),
         );
       }
       return;
