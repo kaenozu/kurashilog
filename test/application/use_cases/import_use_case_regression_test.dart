@@ -35,49 +35,54 @@ void main() {
     expect(importWarningCount(warnings), 7);
   });
 
-  test('cancellation requested during analysis rolls back imported rows', () async {
-    final directory = await Directory.systemTemp.createTemp(
-      'kurashilog-import-cancel-',
-    );
-    final source = File('${directory.path}${Platform.pathSeparator}timeline.json');
-    await source.writeAsString('{}');
+  test(
+    'cancellation requested during analysis rolls back imported rows',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'kurashilog-import-cancel-',
+      );
+      final source = File(
+        '${directory.path}${Platform.pathSeparator}timeline.json',
+      );
+      await source.writeAsString('{}');
 
-    final database = AppDatabase(NativeDatabase.memory());
-    final repository = CorrectionPreservingRepository(database);
-    final token = CancellationToken();
-    final analysis = _CancellingAnalysis(
-      repository: repository,
-      token: token,
-    );
-    final useCase = ImportUseCase(
-      repository: repository,
-      platform: AppPlatform(),
-      analysis: analysis,
-      parser: const _EmptyParser(),
-      validator: const _StubValidator(),
-    );
+      final database = AppDatabase(NativeDatabase.memory());
+      final repository = CorrectionPreservingRepository(database);
+      final token = CancellationToken();
+      final analysis = _CancellingAnalysis(
+        repository: repository,
+        token: token,
+      );
+      final useCase = ImportUseCase(
+        repository: repository,
+        platform: AppPlatform(),
+        analysis: analysis,
+        parser: const _EmptyParser(),
+        validator: const _StubValidator(),
+      );
 
-    addTearDown(() async {
-      await database.close();
-      await directory.delete(recursive: true);
-    });
+      addTearDown(() async {
+        await database.close();
+        await directory.delete(recursive: true);
+      });
 
-    final result = await useCase.importFile(
-      source.path,
-      token: token,
-      previewWarnings: const [
-        ImportWarning('PRE-001', 'プレビューだけの警告', count: 2),
-      ],
-    );
+      final result = await useCase.importFile(
+        source.path,
+        token: token,
+        previewWarnings: const [
+          ImportWarning('PRE-001', 'プレビューだけの警告', count: 2),
+        ],
+      );
 
-    expect(result.ok, isFalse);
-    expect(result.errorCode, 'IMP-005');
-    expect(result.warnings.map((warning) => warning.code), [
-      'PRE-001',
-      'VAL-001',
-    ]);
-    expect(await repository.countVisits(), 0);
-  });
+      expect(result.ok, isFalse);
+      expect(result.errorCode, 'IMP-005');
+      expect(result.warnings.map((warning) => warning.code), [
+        'PRE-001',
+        'VAL-001',
+      ]);
+      expect(await repository.countVisits(), 0);
+    },
+  );
 }
 
 class _CancellingAnalysis extends AnalysisCoordinator {
