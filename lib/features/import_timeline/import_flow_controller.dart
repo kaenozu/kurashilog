@@ -110,19 +110,21 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
     final path = state.cachePath;
     if (path == null) return;
 
+    final preview = state.preview;
     final token = CancellationToken();
     _token?.cancel();
     _token = token;
     state = ImportFlowState(
       phase: ImportPhase.importing,
       cachePath: path,
-      preview: state.preview,
+      preview: preview,
       progress: const ImportProgress(ImportStage.parsing, percent: 0),
     );
 
     final result = await _useCase.importFile(
       path,
       token: token,
+      previewWarnings: preview?.warnings ?? const [],
       onProgress: (progress) {
         if (!identical(_token, token)) return;
         state = state.copyWith(
