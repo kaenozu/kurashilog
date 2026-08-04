@@ -3,7 +3,7 @@ import 'dart:async';
 import '../../application/models/persistence_models.dart';
 import '../../application/repositories/kurashilog_repository.dart';
 import 'app_database_handle.dart';
-import 'kurashilog_repository_impl.dart';
+import 'correction_preserving_repository.dart';
 
 /// Routes every repository operation through the reset-aware database handle.
 class ResettableKurashilogRepository implements KurashilogRepository {
@@ -21,7 +21,7 @@ class ResettableKurashilogRepository implements KurashilogRepository {
       return action(transactionRepository);
     }
     return _handle.run(
-      (database) => action(KurashilogRepositoryImpl(database)),
+      (database) => action(CorrectionPreservingRepository(database)),
     );
   }
 
@@ -33,7 +33,7 @@ class ResettableKurashilogRepository implements KurashilogRepository {
     }
 
     return _handle.run((database) {
-      final repository = KurashilogRepositoryImpl(database);
+      final repository = CorrectionPreservingRepository(database);
       return repository.runInTransaction(
         () => runZoned<Future<T>>(
           action,
