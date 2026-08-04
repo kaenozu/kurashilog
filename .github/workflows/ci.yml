@@ -1,89 +1,77 @@
 name: Flutter CI
 
 on:
+  push:
+    branches:
+      - main
+      - agent/**
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: flutter-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply-and-verify:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v4
-        with:
-          ref: agent/8-import-analysis-integration-20260805
-          fetch-depth: 0
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - name: Apply staged integration test
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Assert dependency resolution kept tracked sources clean
         shell: bash
         run: |
-          git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
-          python3 - <<'PY'
-          from pathlib import Path
-          import subprocess
-          import textwrap
+          changes="$(git status --porcelain --untracked-files=no)"
+          if [[ -n "${changes}" ]]; then
+            echo "Dependency resolution changed tracked checkout files:"
+            printf '%s\n' "${changes}"
+            git diff -- .
+            exit 1
+          fi
 
-          path = Path('.github/workflows/agent-8-apply.yml')
-          source = path.read_text(encoding='utf-8')
-          start_marker = "          mkdir -p test/integration\n"
-          start = source.index(start_marker)
-          end = source.index("\n      - name: Verify changes", start)
-          shell = textwrap.dedent(source[start:end])
-          subprocess.run(['bash', '-lc', shell], check=True)
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
 
-          test_path = Path('test/integration/import_analysis_pipeline_test.dart')
-          test_source = test_path.read_text(encoding='utf-8')
-          test_source = test_source.replace(
-              'expect(progress, containsAll(ImportStage.values));',
-              '''expect(
-                  progress,
-                  containsAll(<ImportStage>[
-                    ImportStage.parsing,
-                    ImportStage.validating,
-                    ImportStage.clustering,
-                    ImportStage.insights,
-                  ]),
-                );''',
-          )
-          test_path.write_text(test_source, encoding='utf-8')
-          PY
+      - name: Analyze
+        run: flutter analyze
 
-      - name: Verify changes
+      - name: Test
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Assert release manifest has no INTERNET permission
         shell: bash
         run: |
-          flutter pub get
-          git diff --exit-code -- pubspec.lock
-          dart format --output=none --set-exit-if-changed lib test
-          flutter analyze
-          flutter test test/integration/import_analysis_pipeline_test.dart
-          flutter test
-          flutter build apk --debug
-          flutter build apk --release
           manifest="$(find build/app/intermediates -path '*release*' -name AndroidManifest.xml | head -n 1)"
           test -n "$manifest"
-          ! grep -q 'android.permission.INTERNET' "$manifest"
-          git diff --check
+          if grep -q 'android.permission.INTERNET' "$manifest"; then
+            echo "Release manifest unexpectedly contains INTERNET permission: $manifest"
+            exit 1
+          fi
 
-      - name: Commit verified changes
+      - name: Assert validation kept tracked sources clean
         shell: bash
         run: |
-          git config user.name 'ChatGPT Agent'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git commit -m 'test: cover import to analysis pipeline [agent-applied]'
-          git push origin HEAD:agent/8-import-analysis-integration-20260805
+          changes="$(git status --porcelain --untracked-files=no)"
+          if [[ -n "${changes}" ]]; then
+            echo "Validation changed tracked checkout files:"
+            printf '%s\n' "${changes}"
+            git diff -- .
+            exit 1
+          fi
