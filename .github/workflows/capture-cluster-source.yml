@@ -1,0 +1,21 @@
+name: Capture cluster review source
+
+on:
+  push:
+    branches:
+      - agent/1-cluster-one-to-one-20260804
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cluster-review-source-${{ github.run_id }}
+          path: |
+            lib/infrastructure/database/kurashilog_repository_impl.dart
+            test/infrastructure/database/kurashilog_repository_impl_test.dart
