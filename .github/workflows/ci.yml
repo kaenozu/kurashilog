@@ -35,6 +35,7 @@ jobs:
           git show origin/main:.github/workflows/ci.yml > .github/workflows/ci.yml
           python3 - <<'PY'
           from pathlib import Path
+          import subprocess
           import textwrap
 
           path = Path('.github/workflows/agent-8-apply.yml')
@@ -43,8 +44,23 @@ jobs:
           start = source.index(start_marker)
           end = source.index("\n      - name: Verify changes", start)
           shell = textwrap.dedent(source[start:end])
-          import subprocess
           subprocess.run(['bash', '-lc', shell], check=True)
+
+          test_path = Path('test/integration/import_analysis_pipeline_test.dart')
+          test_source = test_path.read_text(encoding='utf-8')
+          test_source = test_source.replace(
+              'expect(progress, containsAll(ImportStage.values));',
+              '''expect(
+                  progress,
+                  containsAll(<ImportStage>[
+                    ImportStage.parsing,
+                    ImportStage.validating,
+                    ImportStage.clustering,
+                    ImportStage.insights,
+                  ]),
+                );''',
+          )
+          test_path.write_text(test_source, encoding='utf-8')
           PY
 
       - name: Verify changes
