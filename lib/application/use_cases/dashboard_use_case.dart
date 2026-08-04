@@ -5,7 +5,6 @@ import '../../domain/services/freshness_service.dart';
 import '../../domain/services/summary_service.dart';
 import '../analysis/analysis_coordinator.dart';
 import '../analysis/window.dart';
-import '../models/persistence_models.dart';
 import '../repositories/kurashilog_repository.dart';
 
 /// ホーム表示データ（設計書 7.4 DashboardViewModel）。
@@ -114,16 +113,19 @@ class DashboardUseCase {
     final hasData = import != null && import.isCompleted;
 
     final latestActivity = await repository.latestActivityAt();
-    final freshnessResult = freshness.evaluate(FreshnessInput(
-      nowLocalDate: DateTime.now(),
-      latestImportedAt: latestActivity,
-    ));
+    final freshnessResult = freshness.evaluate(
+      FreshnessInput(
+        nowLocalDate: DateTime.now(),
+        latestImportedAt: latestActivity,
+      ),
+    );
 
     if (!hasData || latestActivity == null) {
       return DashboardData(
         hasData: false,
         freshness: freshnessResult,
-        selectedMonth: selectedMonth ?? SummaryService.yearMonthOf(DateTime.now()),
+        selectedMonth:
+            selectedMonth ?? SummaryService.yearMonthOf(DateTime.now()),
         metrics: const [],
         insights: const [],
         heatmap: const {},
@@ -138,34 +140,35 @@ class DashboardUseCase {
     final mYear = int.parse(parts[0]);
     final mMonth = int.parse(parts[1]);
     final prevMonth = SummaryService.yearMonthOf(
-        DateTime(mYear, mMonth - 1, 1));
+      DateTime(mYear, mMonth - 1, 1),
+    );
 
     final monthly = await repository.monthlySummary(month);
     final previous = await repository.monthlySummary(prevMonth);
 
     final window = computeComparisonWindow(latestActivity.toLocal());
-    final storedInsights =
-        await repository.insightsForPeriod(window.periodKey);
+    final storedInsights = await repository.insightsForPeriod(window.periodKey);
     final insightData = storedInsights
         .where((i) => !i.dismissed)
-        .map((i) => InsightData(
-              ruleId: i.ruleId,
-              severity: i.severity == 'attention'
-                  ? InsightSeverity.attention
-                  : InsightSeverity.information,
-              title: i.title,
-              body: i.body,
-              score: 0,
-              metricJson: const {},
-            ))
+        .map(
+          (i) => InsightData(
+            ruleId: i.ruleId,
+            severity: i.severity == 'attention'
+                ? InsightSeverity.attention
+                : InsightSeverity.information,
+            title: i.title,
+            body: i.body,
+            score: 0,
+            metricJson: const {},
+          ),
+        )
         .toList();
 
     // カレンダー用ヒートマップ（当月の外出有無）
     final daysInMonth = DateTime(mYear, mMonth + 1, 0).day;
     final startDate = '$month-01';
     final endDate = '$month-${daysInMonth.toString().padLeft(2, '0')}';
-    final daily =
-        await repository.dailySummariesBetween(startDate, endDate);
+    final daily = await repository.dailySummariesBetween(startDate, endDate);
     final heatmap = <String, int>{
       for (final d in daily) d.localDate: d.outingFlag ? 1 : 0,
     };
@@ -185,7 +188,9 @@ class DashboardUseCase {
   }
 
   List<MetricCardData> _buildHomeMetrics(
-      MonthlySummaryData? current, MonthlySummaryData? previous) {
+    MonthlySummaryData? current,
+    MonthlySummaryData? previous,
+  ) {
     if (current == null) return const [];
 
     final prevOuting = previous?.outingDays ?? 0;
@@ -287,14 +292,16 @@ class DashboardUseCase {
       final local = v.startAtUtc.toLocal();
       if (local.year != y || local.month != m || local.day != d) continue;
       final dwell = v.endAtUtc.difference(v.startAtUtc).inMinutes;
-      entries.add(DayTimelineEntry(
-        kind: 'visit',
-        startsAt: v.startAtUtc.toLocal(),
-        endsAt: v.endAtUtc.toLocal(),
-        placeName: v.clusterId != null ? nameById[v.clusterId] : null,
-        dwellMinutes: dwell,
-        latLng: (v.latE7, v.lngE7),
-      ));
+      entries.add(
+        DayTimelineEntry(
+          kind: 'visit',
+          startsAt: v.startAtUtc.toLocal(),
+          endsAt: v.endAtUtc.toLocal(),
+          placeName: v.clusterId != null ? nameById[v.clusterId] : null,
+          dwellMinutes: dwell,
+          latLng: (v.latE7, v.lngE7),
+        ),
+      );
     }
     for (final mv in movements) {
       final local = mv.startAtUtc.toLocal();
@@ -302,14 +309,16 @@ class DashboardUseCase {
       if (mv.validDistance && mv.distanceM != null) {
         totalDistance += mv.distanceM!;
       }
-      entries.add(DayTimelineEntry(
-        kind: 'movement',
-        startsAt: mv.startAtUtc.toLocal(),
-        endsAt: mv.endAtUtc.toLocal(),
-        distanceM: mv.distanceM,
-        distanceLabel: mv.distanceMethod.displayLabel,
-        activityType: mv.activityType,
-      ));
+      entries.add(
+        DayTimelineEntry(
+          kind: 'movement',
+          startsAt: mv.startAtUtc.toLocal(),
+          endsAt: mv.endAtUtc.toLocal(),
+          distanceM: mv.distanceM,
+          distanceLabel: mv.distanceMethod.displayLabel,
+          activityType: mv.activityType,
+        ),
+      );
     }
 
     entries.sort((a, b) => a.startsAt.compareTo(b.startsAt));
@@ -330,7 +339,6 @@ class DashboardUseCase {
     return '$prefix $sign$delta${percent ? '%' : ''}';
   }
 
-  String _km(int meters) => meters >= 1000
-      ? '${(meters / 1000).toStringAsFixed(1)}km'
-      : '${meters}m';
+  String _km(int meters) =>
+      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/main_shell.dart';
 import '../../application/providers.dart';
 
 /// 初回説明（設計書 SC-01 / FR-001）。3 画面以内で説明し、開始ボタン。
@@ -34,10 +35,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ),
     _OnboardingPageData(
       icon: Icons.delete_outline,
-      title: 'いつでも完全に削除できます',
+      title: 'いつでもデータを削除できます',
       body:
-          '設定からすべてのデータを削除できます。\n'
-          'オフラインで削除が完了し、再起動しても復元されません。',
+          '設定からすべてのアプリ内データを削除できます。\n'
+          '削除はオフラインで完了します。',
     ),
   ];
 
@@ -66,13 +67,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(p.icon, size: 96, color: theme.colorScheme.primary),
+                        Icon(
+                          p.icon,
+                          size: 96,
+                          color: theme.colorScheme.primary,
+                        ),
                         const SizedBox(height: 32),
                         Text(
                           p.title,
                           textAlign: TextAlign.center,
-                          style: theme.textTheme.headlineSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(height: 16),
                         Text(

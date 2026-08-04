@@ -17,7 +17,8 @@ class DistanceService {
     final dLat = (b.lat - a.lat) * math.pi / 180;
     final dLng = (b.lng - a.lng) * math.pi / 180;
 
-    final h = math.pow(math.sin(dLat / 2), 2) +
+    final h =
+        math.pow(math.sin(dLat / 2), 2) +
         math.cos(lat1) * math.cos(lat2) * math.pow(math.sin(dLng / 2), 2);
     return 2 * earthRadiusM * math.asin(math.sqrt(h.clamp(0.0, 1.0)));
   }
@@ -32,7 +33,11 @@ class DistanceService {
   }
 
   /// 移動の平均速度（m/s）。duration が 0 以下なら null。
-  double? speedMps({required int distanceM, required DateTime start, required DateTime end}) {
+  double? speedMps({
+    required int distanceM,
+    required DateTime start,
+    required DateTime end,
+  }) {
     final durationSec = end.difference(start).inSeconds;
     if (durationSec <= 0) return null;
     return distanceM / durationSec;

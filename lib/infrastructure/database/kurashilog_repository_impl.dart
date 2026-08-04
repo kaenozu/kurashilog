@@ -5,41 +5,45 @@ import '../../application/repositories/kurashilog_repository.dart';
 import '../../domain/models/distance_method.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/models/summaries.dart';
+import '../../domain/services/clustering_service.dart';
+import '../../domain/services/distance_service.dart';
 import 'app_database.dart';
-import 'tables.dart';
 
-/// Drift による [KurashilogRepository] 実装。
-///
-/// トランザクション境界はユースケースが指定し、ここでは
-/// 「全解析成功後に単一トランザクションで本テーブルへ反映」を実現する
-/// プリミティブ（[insertNewRecords] 等）を提供する。
 class KurashilogRepositoryImpl implements KurashilogRepository {
   KurashilogRepositoryImpl(this._db);
 
   final AppDatabase _db;
 
-  // --- インポート管理 ---
+  @override
+  Future<T> runInTransaction<T>(Future<T> Function() action) =>
+      _db.transaction(action);
 
   @override
   Future<ImportedFileRecord?> latestCompletedImport() async {
-    final rows = await (_db.select(_db.timelineImports)
-          ..where((t) => t.status.equals('completed'))
-          ..orderBy([(t) => OrderingTerm.desc(t.id)])
-          ..limit(1))
-        .get();
-    if (rows.isEmpty) return null;
-    return _importToDomain(rows.first);
+    final rows =
+        await (_db.select(_db.timelineImports)
+              ..where((table) => table.status.equals('completed'))
+              ..orderBy([(table) => OrderingTerm.desc(table.id)])
+              ..limit(1))
+            .get();
+    return rows.isEmpty ? null : _importToDomain(rows.first);
   }
 
   @override
   Future<int> insertImport(ImportedFileRecord record) =>
-      _db.into(_db.timelineImports).insert(_importToDb(record));
+      _db.into(_db.timelineImports).insert(_importInsertCompanion(record));
 
   @override
-  Future<void> updateImport(ImportedFileRecord record) =>
-      _db.update(_db.timelineImports).replace(_importToDb(record));
-
-  // --- 訪問・移動 ---
+  Future<void> updateImport(ImportedFileRecord record) async {
+    if (record.id <= 0) throw ArgumentError.value(record.id, 'record.id');
+    final updated =
+        await (_db.update(_db.timelineImports)
+              ..where((table) => table.id.equals(record.id)))
+            .write(_importUpdateCompanion(record));
+    if (updated != 1) {
+      throw StateError('Expected to update one import row, updated $updated');
+    }
+  }
 
   @override
   Future<int> countVisits() => _db.visits.count().getSingle();
@@ -49,55 +53,65 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<DateTime?> latestActivityAt() async {
-    final v = await (_db.selectOnly(_db.visits)
-          ..addColumns([_db.visits.endAtUtc.max()]))
-        .getSingle();
-    final m = await (_db.selectOnly(_db.movements)
-          ..addColumns([_db.movements.endAtUtc.max()]))
-        .getSingle();
-    final a = v.read(_db.visits.endAtUtc);
-    final b = m.read(_db.movements.endAtUtc);
-    if (a == null) return b;
-    if (b == null) return a;
-    return a.isAfter(b) ? a : b;
+    final visitRow = await (_db.selectOnly(
+      _db.visits,
+    )..addColumns([_db.visits.endAtUtc.max()])).getSingle();
+    final movementRow = await (_db.selectOnly(
+      _db.movements,
+    )..addColumns([_db.movements.endAtUtc.max()])).getSingle();
+    final visit = visitRow.read(_db.visits.endAtUtc.max());
+    final movement = movementRow.read(_db.movements.endAtUtc.max());
+    if (visit == null) return movement;
+    if (movement == null) return visit;
+    return visit.isAfter(movement) ? visit : movement;
   }
 
   @override
   Future<DateTime?> earliestActivityAt() async {
-    final v = await (_db.selectOnly(_db.visits)
-          ..addColumns([_db.visits.startAtUtc.min()]))
-        .getSingle();
-    final m = await (_db.selectOnly(_db.movements)
-          ..addColumns([_db.movements.startAtUtc.min()]))
-        .getSingle();
-    final a = v.read(_db.visits.startAtUtc);
-    final b = m.read(_db.movements.startAtUtc);
-    if (a == null) return b;
-    if (b == null) return a;
-    return a.isBefore(b) ? a : b;
+    final visitRow = await (_db.selectOnly(
+      _db.visits,
+    )..addColumns([_db.visits.startAtUtc.min()])).getSingle();
+    final movementRow = await (_db.selectOnly(
+      _db.movements,
+    )..addColumns([_db.movements.startAtUtc.min()])).getSingle();
+    final visit = visitRow.read(_db.visits.startAtUtc.min());
+    final movement = movementRow.read(_db.movements.startAtUtc.min());
+    if (visit == null) return movement;
+    if (movement == null) return visit;
+    return visit.isBefore(movement) ? visit : movement;
   }
 
   @override
   Future<List<StoredVisit>> visitsInRange(
-      DateTime startUtc, DateTime endUtc) async {
-    final rows = await (_db.select(_db.visits)
-          ..where((t) =>
-              t.endAtUtc.isBiggerOrEqualValue(startUtc) &
-              t.startAtUtc.isSmallerOrEqualValue(endUtc))
-          ..orderBy([(t) => OrderingTerm.asc(t.startAtUtc)]))
-        .get();
+    DateTime startUtc,
+    DateTime endUtc,
+  ) async {
+    final rows =
+        await (_db.select(_db.visits)
+              ..where(
+                (table) =>
+                    table.endAtUtc.isBiggerOrEqualValue(startUtc) &
+                    table.startAtUtc.isSmallerThanValue(endUtc),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
+            .get();
     return rows.map(_visitToDomain).toList();
   }
 
   @override
   Future<List<StoredMovement>> movementsInRange(
-      DateTime startUtc, DateTime endUtc) async {
-    final rows = await (_db.select(_db.movements)
-          ..where((t) =>
-              t.endAtUtc.isBiggerOrEqualValue(startUtc) &
-              t.startAtUtc.isSmallerOrEqualValue(endUtc))
-          ..orderBy([(t) => OrderingTerm.asc(t.startAtUtc)]))
-        .get();
+    DateTime startUtc,
+    DateTime endUtc,
+  ) async {
+    final rows =
+        await (_db.select(_db.movements)
+              ..where(
+                (table) =>
+                    table.endAtUtc.isBiggerOrEqualValue(startUtc) &
+                    table.startAtUtc.isSmallerThanValue(endUtc),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.startAtUtc)]))
+            .get();
     return rows.map(_movementToDomain).toList();
   }
 
@@ -115,24 +129,27 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     required List<StoredMovement> movements,
   }) {
     return _db.transaction(() async {
-      final beforeV = await countVisits();
-      final beforeM = await countMovements();
-
-      final vRows = visits.map(_visitToDb).toList();
-      final mRows = movements.map(_movementToDb).toList();
-
-      await _db.batch((b) {
-        b.insertAll(_db.visits, vRows,
-            onConflict: DoNothing(target: [_db.visits.sourceKey]));
-        b.insertAll(_db.movements, mRows,
-            onConflict: DoNothing(target: [_db.movements.sourceKey]));
+      final beforeVisits = await countVisits();
+      final beforeMovements = await countMovements();
+      await _db.batch((batch) {
+        if (visits.isNotEmpty) {
+          batch.insertAll(
+            _db.visits,
+            visits.map(_visitToDb).toList(),
+            onConflict: DoNothing(target: [_db.visits.sourceKey]),
+          );
+        }
+        if (movements.isNotEmpty) {
+          batch.insertAll(
+            _db.movements,
+            movements.map(_movementToDb).toList(),
+            onConflict: DoNothing(target: [_db.movements.sourceKey]),
+          );
+        }
       });
-
-      final afterV = await countVisits();
-      final afterM = await countMovements();
       return ImportDiffResult(
-        addedVisits: afterV - beforeV,
-        addedMovements: afterM - beforeM,
+        addedVisits: await countVisits() - beforeVisits,
+        addedMovements: await countMovements() - beforeMovements,
       );
     });
   }
@@ -140,77 +157,148 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   @override
   Future<void> assignVisitClusterIds(Map<int, int> clusterIdByVisitId) {
     return _db.transaction(() async {
-      await _db.batch((b) {
+      await _db.batch((batch) {
         for (final entry in clusterIdByVisitId.entries) {
-          b.update(
+          batch.update(
             _db.visits,
             VisitsCompanion(clusterId: Value(entry.value)),
-            where: (t) => t.id.equals(entry.key),
+            where: (table) => table.id.equals(entry.key),
           );
         }
       });
     });
   }
 
-  // --- クラスタ・ラベル ---
-
   @override
   Future<void> replaceAllClusters(List<StoredCluster> clusters) {
     return _db.transaction(() async {
+      final existingRows = await _db.select(_db.placeClusters).get();
+      final existingByKey = {
+        for (final row in existingRows) row.stableKey: row,
+      };
+
       await _db.delete(_db.placeClusters).go();
-      await _db.batch((b) {
-        b.insertAll(_db.placeClusters, clusters.map(_clusterToDb).toList());
-      });
+      if (clusters.isEmpty) return;
+
+      final rows = clusters.map((cluster) {
+        var existing = existingByKey[cluster.stableKey];
+        existing ??= _nearestExisting(existingRows, cluster);
+        return _clusterToDb(
+          StoredCluster(
+            id: cluster.id,
+            stableKey: cluster.stableKey,
+            centroidLatE7: cluster.centroidLatE7,
+            centroidLngE7: cluster.centroidLngE7,
+            radiusM: cluster.radiusM,
+            visitCount: cluster.visitCount,
+            dwellSeconds: cluster.dwellSeconds,
+            firstAt: cluster.firstAt,
+            lastAt: cluster.lastAt,
+            labelId: existing?.labelId,
+            excluded: existing?.excluded ?? false,
+          ),
+        );
+      }).toList();
+      await _db.batch((batch) => batch.insertAll(_db.placeClusters, rows));
     });
+  }
+
+  /// stableKey が変わったクラスタでも、既存クラスタ重心との距離が
+  /// クラスタ統合距離（maxMergeDistanceM）以内の最寄りから
+  /// ラベル・分析除外設定を引き継ぐ。
+  PlaceClusterRow? _nearestExisting(
+    List<PlaceClusterRow> existingRows,
+    StoredCluster cluster,
+  ) {
+    if (existingRows.isEmpty) return null;
+    final distance = const DistanceService();
+    final maxMatchM = const ClusteringService().maxMergeDistanceM;
+    final candidate = LatLngE7(cluster.centroidLatE7, cluster.centroidLngE7);
+
+    var best = existingRows.first;
+    var bestDistance = distance.haversineMeters(
+      candidate,
+      LatLngE7(best.centroidLatE7, best.centroidLngE7),
+    );
+    for (final row in existingRows.skip(1)) {
+      final candidateDistance = distance.haversineMeters(
+        candidate,
+        LatLngE7(row.centroidLatE7, row.centroidLngE7),
+      );
+      if (candidateDistance < bestDistance) {
+        best = row;
+        bestDistance = candidateDistance;
+      }
+    }
+    return bestDistance <= maxMatchM ? best : null;
   }
 
   @override
   Future<List<StoredCluster>> allClusters() async {
     final query = _db.select(_db.placeClusters).join([
-      leftOuterJoin(_db.placeLabels,
-          _db.placeLabels.id.equalsExp(_db.placeClusters.labelId)),
+      leftOuterJoin(
+        _db.placeLabels,
+        _db.placeLabels.id.equalsExp(_db.placeClusters.labelId),
+      ),
     ]);
     final rows = await query.get();
-    return rows.map((r) {
-      final c = r.readTable(_db.placeClusters);
-      final l = r.readTableOrNull(_db.placeLabels);
-      return _clusterToDomain(c, label: l);
+    return rows.map((row) {
+      return _clusterToDomain(
+        row.readTable(_db.placeClusters),
+        label: row.readTableOrNull(_db.placeLabels),
+      );
     }).toList();
   }
 
   @override
   Future<StoredCluster?> clusterById(int id) async {
     final query = _db.select(_db.placeClusters).join([
-      leftOuterJoin(_db.placeLabels,
-          _db.placeLabels.id.equalsExp(_db.placeClusters.labelId)),
-    ])
-      ..where(_db.placeClusters.id.equals(id));
+      leftOuterJoin(
+        _db.placeLabels,
+        _db.placeLabels.id.equalsExp(_db.placeClusters.labelId),
+      ),
+    ])..where(_db.placeClusters.id.equals(id));
     final rows = await query.get();
     if (rows.isEmpty) return null;
-    final r = rows.first;
     return _clusterToDomain(
-      r.readTable(_db.placeClusters),
-      label: r.readTableOrNull(_db.placeLabels),
+      rows.first.readTable(_db.placeClusters),
+      label: rows.first.readTableOrNull(_db.placeLabels),
     );
   }
 
   @override
-  Future<void> updateClusterLabel(int clusterId, int? labelId) =>
-      (_db.update(_db.placeClusters)..where((t) => t.id.equals(clusterId)))
-          .write(PlaceClustersCompanion(labelId: Value(labelId)));
+  Future<void> updateClusterLabel(int clusterId, int? labelId) async {
+    final updated =
+        await (_db.update(_db.placeClusters)
+              ..where((table) => table.id.equals(clusterId)))
+            .write(PlaceClustersCompanion(labelId: Value(labelId)));
+    if (updated != 1) throw StateError('Cluster $clusterId was not found');
+  }
 
   @override
-  Future<void> setClusterExcluded(int clusterId, bool excluded) =>
-      (_db.update(_db.placeClusters)..where((t) => t.id.equals(clusterId)))
-          .write(PlaceClustersCompanion(excluded: Value(excluded)));
+  Future<void> setClusterExcluded(int clusterId, bool excluded) async {
+    final updated =
+        await (_db.update(_db.placeClusters)
+              ..where((table) => table.id.equals(clusterId)))
+            .write(PlaceClustersCompanion(excluded: Value(excluded)));
+    if (updated != 1) throw StateError('Cluster $clusterId was not found');
+  }
 
   @override
   Future<int> insertLabel(StoredLabel label) =>
-      _db.into(_db.placeLabels).insert(_labelToDb(label));
+      _db.into(_db.placeLabels).insert(_labelInsertCompanion(label));
 
   @override
-  Future<void> updateLabel(StoredLabel label) =>
-      _db.update(_db.placeLabels).replace(_labelToDb(label));
+  Future<void> updateLabel(StoredLabel label) async {
+    if (label.id <= 0) throw ArgumentError.value(label.id, 'label.id');
+    final updated =
+        await (_db.update(_db.placeLabels)
+              ..where((table) => table.id.equals(label.id)))
+            .write(_labelUpdateCompanion(label));
+    if (updated != 1) {
+      throw StateError('Expected to update one label row, updated $updated');
+    }
+  }
 
   @override
   Future<List<StoredLabel>> allLabels() async =>
@@ -218,120 +306,131 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
 
   @override
   Future<StoredLabel?> labelById(int id) async {
-    final rows = await (_db.select(_db.placeLabels)
-          ..where((t) => t.id.equals(id)))
-        .get();
+    final rows = await (_db.select(
+      _db.placeLabels,
+    )..where((table) => table.id.equals(id))).get();
     return rows.isEmpty ? null : _labelToDomain(rows.first);
   }
 
-  // --- サマリー ---
-
   @override
-  Future<void> upsertDailySummaries(List<DailySummaryRecord> rows) {
-    return _db.transaction(() async {
-      await _db.batch((b) {
-        b.insertAllOnConflictUpdate(
-            _db.dailySummaries, rows.map(_dailyToDb).toList());
-      });
+  Future<void> upsertDailySummaries(List<DailySummaryRecord> rows) async {
+    if (rows.isEmpty) return;
+    await _db.batch((batch) {
+      batch.insertAllOnConflictUpdate(
+        _db.dailySummaries,
+        rows.map(_dailyToDb).toList(),
+      );
     });
   }
 
   @override
-  Future<void> upsertMonthlySummaries(List<MonthlySummaryRecord> rows) {
-    return _db.transaction(() async {
-      await _db.batch((b) {
-        b.insertAllOnConflictUpdate(
-            _db.monthlySummaries, rows.map(_monthlyToDb).toList());
-      });
+  Future<void> upsertMonthlySummaries(List<MonthlySummaryRecord> rows) async {
+    if (rows.isEmpty) return;
+    await _db.batch((batch) {
+      batch.insertAllOnConflictUpdate(
+        _db.monthlySummaries,
+        rows.map(_monthlyToDb).toList(),
+      );
     });
   }
 
   @override
   Future<List<DailySummaryRecord>> dailySummariesBetween(
-      String startDate, String endDate) async {
-    final rows = await (_db.select(_db.dailySummaries)
-          ..where((t) =>
-              t.localDate.isBiggerOrEqualValue(startDate) &
-              t.localDate.isSmallerOrEqualValue(endDate))
-          ..orderBy([(t) => OrderingTerm.asc(t.localDate)]))
-        .get();
+    String startDate,
+    String endDate,
+  ) async {
+    final rows =
+        await (_db.select(_db.dailySummaries)
+              ..where(
+                (table) =>
+                    table.localDate.isBiggerOrEqualValue(startDate) &
+                    table.localDate.isSmallerOrEqualValue(endDate),
+              )
+              ..orderBy([(table) => OrderingTerm.asc(table.localDate)]))
+            .get();
     return rows.map(_dailyToDomain).toList();
   }
 
   @override
   Future<MonthlySummaryRecord?> monthlySummary(String yearMonth) async {
-    final rows = await (_db.select(_db.monthlySummaries)
-          ..where((t) => t.yearMonth.equals(yearMonth)))
-        .get();
-    if (rows.isEmpty) return null;
-    return _monthlyToDomain(rows.first);
+    final rows = await (_db.select(
+      _db.monthlySummaries,
+    )..where((table) => table.yearMonth.equals(yearMonth))).get();
+    return rows.isEmpty ? null : _monthlyToDomain(rows.first);
   }
 
   @override
   Future<List<MonthlySummaryRecord>> allMonthlySummaries() async =>
-      (await _db.select(_db.monthlySummaries).get()).map(_monthlyToDomain).toList();
+      (await _db.select(_db.monthlySummaries).get())
+          .map(_monthlyToDomain)
+          .toList();
 
   @override
-  Future<void> invalidateSummariesAfter(String startDate) async {
-    await _db.transaction(() async {
+  Future<void> invalidateSummariesAfter(String startDate) {
+    return _db.transaction(() async {
       await (_db.delete(_db.dailySummaries)
-            ..where((t) => t.localDate.isBiggerOrEqualValue(startDate)))
+            ..where((table) => table.localDate.isBiggerOrEqualValue(startDate)))
           .go();
-      final ym = startDate.length >= 7 ? startDate.substring(0, 7) : startDate;
-      await (_db.delete(_db.monthlySummaries)
-            ..where((t) => t.yearMonth.isBiggerOrEqualValue(ym)))
-          .go();
+      final month = startDate.length >= 7
+          ? startDate.substring(0, 7)
+          : startDate;
+      await (_db.delete(
+        _db.monthlySummaries,
+      )..where((table) => table.yearMonth.isBiggerOrEqualValue(month))).go();
     });
   }
 
-  // --- インサイト ---
-
   @override
   Future<void> replaceInsightsForPeriod(
-      String periodKey, List<StoredInsight> insights) {
+    String periodKey,
+    List<StoredInsight> insights,
+  ) {
     return _db.transaction(() async {
-      await (_db.delete(_db.insights)..where((t) => t.periodKey.equals(periodKey)))
-          .go();
-      await _db.batch((b) {
-        b.insertAll(_db.insights, insights.map(_insightToDb).toList());
-      });
+      await (_db.delete(
+        _db.insights,
+      )..where((table) => table.periodKey.equals(periodKey))).go();
+      if (insights.isNotEmpty) {
+        await _db.batch((batch) {
+          batch.insertAll(_db.insights, insights.map(_insightToDb).toList());
+        });
+      }
     });
   }
 
   @override
   Future<List<StoredInsight>> insightsForPeriod(String periodKey) async {
-    final rows = await (_db.select(_db.insights)
-          ..where((t) => t.periodKey.equals(periodKey))
-          ..orderBy([(t) => OrderingTerm.asc(t.id)]))
-        .get();
+    final rows =
+        await (_db.select(_db.insights)
+              ..where((table) => table.periodKey.equals(periodKey))
+              ..orderBy([(table) => OrderingTerm.asc(table.id)]))
+            .get();
     return rows.map(_insightToDomain).toList();
   }
 
-  // --- 設定 ---
-
   @override
   Future<AppSettingRecord?> getSetting(String key) async {
-    final rows = await (_db.select(_db.appSettings)
-          ..where((t) => t.key.equals(key)))
-        .get();
+    final rows = await (_db.select(
+      _db.appSettings,
+    )..where((table) => table.key.equals(key))).get();
     if (rows.isEmpty) return null;
-    final r = rows.first;
+    final row = rows.first;
     return AppSettingRecord(
-      key: r.key,
-      value: r.value,
-      updatedAt: r.updatedAt,
+      key: row.key,
+      value: row.value,
+      updatedAt: row.updatedAt,
     );
   }
 
   @override
-  Future<void> setSetting(String key, String value) =>
-      _db.into(_db.appSettings).insertOnConflictUpdate(AppSettingsCompanion.insert(
-        key: key,
-        value: value,
-        updatedAt: DateTime.now(),
-      ));
-
-  // --- データ管理 ---
+  Future<void> setSetting(String key, String value) => _db
+      .into(_db.appSettings)
+      .insertOnConflictUpdate(
+        AppSettingsCompanion.insert(
+          key: key,
+          value: value,
+          updatedAt: DateTime.now(),
+        ),
+      );
 
   @override
   Future<void> deleteAllUserData() {
@@ -339,8 +438,8 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       await _db.delete(_db.insights).go();
       await _db.delete(_db.monthlySummaries).go();
       await _db.delete(_db.dailySummaries).go();
-      await _db.delete(_db.placeLabels).go();
       await _db.delete(_db.placeClusters).go();
+      await _db.delete(_db.placeLabels).go();
       await _db.delete(_db.movements).go();
       await _db.delete(_db.visits).go();
       await _db.delete(_db.timelineImports).go();
@@ -348,238 +447,263 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     });
   }
 
-  // --- 変換 ---
-
-  TimelineImportsCompanion _importToDb(ImportedFileRecord r) =>
+  TimelineImportsCompanion _importInsertCompanion(ImportedFileRecord record) =>
       TimelineImportsCompanion.insert(
-        fileHash: r.fileHash,
-        schemaType: r.schemaType,
-        startedAt: r.startedAt,
-        completedAt: Value(r.completedAt),
-        sourceMinAt: Value(r.sourceMinAt),
-        sourceMaxAt: Value(r.sourceMaxAt),
-        status: r.status,
-        warningCount: Value(r.warningCount),
-        addedVisits: Value(r.addedVisits),
-        addedMovements: Value(r.addedMovements),
+        fileHash: record.fileHash,
+        schemaType: record.schemaType,
+        startedAt: record.startedAt,
+        completedAt: Value(record.completedAt),
+        sourceMinAt: Value(record.sourceMinAt),
+        sourceMaxAt: Value(record.sourceMaxAt),
+        status: record.status,
+        warningCount: Value(record.warningCount),
+        addedVisits: Value(record.addedVisits),
+        addedMovements: Value(record.addedMovements),
       );
 
-  ImportedFileRecord _importToDomain(TimelineImportRow r) => ImportedFileRecord(
-        id: r.id,
-        fileHash: r.fileHash,
-        schemaType: r.schemaType,
-        startedAt: r.startedAt,
-        completedAt: r.completedAt,
-        sourceMinAt: r.sourceMinAt,
-        sourceMaxAt: r.sourceMaxAt,
-        status: r.status,
-        warningCount: r.warningCount,
-        addedVisits: r.addedVisits,
-        addedMovements: r.addedMovements,
+  TimelineImportsCompanion _importUpdateCompanion(ImportedFileRecord record) =>
+      TimelineImportsCompanion(
+        fileHash: Value(record.fileHash),
+        schemaType: Value(record.schemaType),
+        startedAt: Value(record.startedAt),
+        completedAt: Value(record.completedAt),
+        sourceMinAt: Value(record.sourceMinAt),
+        sourceMaxAt: Value(record.sourceMaxAt),
+        status: Value(record.status),
+        warningCount: Value(record.warningCount),
+        addedVisits: Value(record.addedVisits),
+        addedMovements: Value(record.addedMovements),
       );
 
-  VisitsCompanion _visitToDb(StoredVisit v) => VisitsCompanion.insert(
-        sourceKey: v.sourceKey,
-        startAtUtc: v.startAtUtc,
-        endAtUtc: v.endAtUtc,
-        latE7: v.latE7,
-        lngE7: v.lngE7,
-        accuracyM: Value(v.accuracyM),
-        sourceLabel: Value(v.sourceLabel),
-        clusterId: Value(v.clusterId),
-        confidence: Value(v.confidence),
+  ImportedFileRecord _importToDomain(TimelineImportRow row) =>
+      ImportedFileRecord(
+        id: row.id,
+        fileHash: row.fileHash,
+        schemaType: row.schemaType,
+        startedAt: row.startedAt,
+        completedAt: row.completedAt,
+        sourceMinAt: row.sourceMinAt,
+        sourceMaxAt: row.sourceMaxAt,
+        status: row.status,
+        warningCount: row.warningCount,
+        addedVisits: row.addedVisits,
+        addedMovements: row.addedMovements,
       );
 
-  StoredVisit _visitToDomain(VisitRow r) => StoredVisit(
-        id: r.id,
-        sourceKey: r.sourceKey,
-        startAtUtc: r.startAtUtc,
-        endAtUtc: r.endAtUtc,
-        latE7: r.latE7,
-        lngE7: r.lngE7,
-        accuracyM: r.accuracyM,
-        sourceLabel: r.sourceLabel,
-        clusterId: r.clusterId,
-        confidence: r.confidence,
-      );
+  VisitsCompanion _visitToDb(StoredVisit visit) => VisitsCompanion.insert(
+    sourceKey: visit.sourceKey,
+    startAtUtc: visit.startAtUtc,
+    endAtUtc: visit.endAtUtc,
+    latE7: visit.latE7,
+    lngE7: visit.lngE7,
+    accuracyM: Value(visit.accuracyM),
+    sourceLabel: Value(visit.sourceLabel),
+    clusterId: Value(visit.clusterId),
+    confidence: Value(visit.confidence),
+  );
 
-  MovementsCompanion _movementToDb(StoredMovement m) =>
+  StoredVisit _visitToDomain(VisitRow row) => StoredVisit(
+    id: row.id,
+    sourceKey: row.sourceKey,
+    startAtUtc: row.startAtUtc,
+    endAtUtc: row.endAtUtc,
+    latE7: row.latE7,
+    lngE7: row.lngE7,
+    accuracyM: row.accuracyM,
+    sourceLabel: row.sourceLabel,
+    clusterId: row.clusterId,
+    confidence: row.confidence,
+  );
+
+  MovementsCompanion _movementToDb(StoredMovement movement) =>
       MovementsCompanion.insert(
-        sourceKey: m.sourceKey,
-        startAtUtc: m.startAtUtc,
-        endAtUtc: m.endAtUtc,
-        startLatE7: Value(m.startLatLng?.latE7),
-        startLngE7: Value(m.startLatLng?.lngE7),
-        endLatE7: Value(m.endLatLng?.latE7),
-        endLngE7: Value(m.endLatLng?.lngE7),
-        distanceM: Value(m.distanceM),
-        distanceMethod: m.distanceMethod.dbValue,
-        activityType: Value(m.activityType),
-        confidence: Value(m.confidence),
-        pathJson: Value(_encodePath(m.path)),
-        validDistance: Value(m.validDistance),
+        sourceKey: movement.sourceKey,
+        startAtUtc: movement.startAtUtc,
+        endAtUtc: movement.endAtUtc,
+        startLatE7: Value(movement.startLatLng?.latE7),
+        startLngE7: Value(movement.startLatLng?.lngE7),
+        endLatE7: Value(movement.endLatLng?.latE7),
+        endLngE7: Value(movement.endLatLng?.lngE7),
+        distanceM: Value(movement.distanceM),
+        distanceMethod: movement.distanceMethod.dbValue,
+        activityType: Value(movement.activityType),
+        confidence: Value(movement.confidence),
+        pathJson: Value(_encodePath(movement.path)),
+        validDistance: Value(movement.validDistance),
       );
 
-  StoredMovement _movementToDomain(MovementRow r) => StoredMovement(
-        id: r.id,
-        sourceKey: r.sourceKey,
-        startAtUtc: r.startAtUtc,
-        endAtUtc: r.endAtUtc,
-        distanceM: r.distanceM,
-        distanceMethod: DistanceMethod.fromDb(r.distanceMethod),
-        activityType: r.activityType,
-        confidence: r.confidence,
-        startLatLng: r.startLatE7 != null && r.startLngE7 != null
-            ? LatLngE7(r.startLatE7!, r.startLngE7!)
-            : null,
-        endLatLng: r.endLatE7 != null && r.endLngE7 != null
-            ? LatLngE7(r.endLatE7!, r.endLngE7!)
-            : null,
-        path: _decodePath(r.pathJson),
-        validDistance: r.validDistance,
-      );
+  StoredMovement _movementToDomain(MovementRow row) => StoredMovement(
+    id: row.id,
+    sourceKey: row.sourceKey,
+    startAtUtc: row.startAtUtc,
+    endAtUtc: row.endAtUtc,
+    distanceM: row.distanceM,
+    distanceMethod: DistanceMethod.fromDb(row.distanceMethod),
+    activityType: row.activityType,
+    confidence: row.confidence,
+    startLatLng: row.startLatE7 != null && row.startLngE7 != null
+        ? LatLngE7(row.startLatE7!, row.startLngE7!)
+        : null,
+    endLatLng: row.endLatE7 != null && row.endLngE7 != null
+        ? LatLngE7(row.endLatE7!, row.endLngE7!)
+        : null,
+    path: _decodePath(row.pathJson),
+    validDistance: row.validDistance,
+  );
 
-  PlaceClustersCompanion _clusterToDb(StoredCluster c) =>
+  PlaceClustersCompanion _clusterToDb(StoredCluster cluster) =>
       PlaceClustersCompanion.insert(
-        stableKey: c.stableKey,
-        centroidLatE7: c.centroidLatE7,
-        centroidLngE7: c.centroidLngE7,
-        radiusM: c.radiusM,
-        visitCount: c.visitCount,
-        dwellSeconds: c.dwellSeconds,
-        firstAt: c.firstAt,
-        lastAt: c.lastAt,
-        labelId: Value(c.labelId),
-        excluded: Value(c.excluded),
+        stableKey: cluster.stableKey,
+        centroidLatE7: cluster.centroidLatE7,
+        centroidLngE7: cluster.centroidLngE7,
+        radiusM: cluster.radiusM,
+        visitCount: cluster.visitCount,
+        dwellSeconds: cluster.dwellSeconds,
+        firstAt: cluster.firstAt,
+        lastAt: cluster.lastAt,
+        labelId: Value(cluster.labelId),
+        excluded: Value(cluster.excluded),
       );
 
-  StoredCluster _clusterToDomain(PlaceClusterRow c, {PlaceLabelRow? label}) =>
-      StoredCluster(
-        id: c.id,
-        stableKey: c.stableKey,
-        centroidLatE7: c.centroidLatE7,
-        centroidLngE7: c.centroidLngE7,
-        radiusM: c.radiusM,
-        visitCount: c.visitCount,
-        dwellSeconds: c.dwellSeconds,
-        firstAt: c.firstAt,
-        lastAt: c.lastAt,
-        labelId: c.labelId,
-        excluded: c.excluded,
-        labelName: label?.displayName,
-        category: label?.category,
-        isBasePlace: label?.isBasePlace ?? false,
-      );
+  StoredCluster _clusterToDomain(
+    PlaceClusterRow cluster, {
+    PlaceLabelRow? label,
+  }) => StoredCluster(
+    id: cluster.id,
+    stableKey: cluster.stableKey,
+    centroidLatE7: cluster.centroidLatE7,
+    centroidLngE7: cluster.centroidLngE7,
+    radiusM: cluster.radiusM,
+    visitCount: cluster.visitCount,
+    dwellSeconds: cluster.dwellSeconds,
+    firstAt: cluster.firstAt,
+    lastAt: cluster.lastAt,
+    labelId: cluster.labelId,
+    excluded: cluster.excluded,
+    labelName: label?.displayName,
+    category: label?.category,
+    isBasePlace: label?.isBasePlace ?? false,
+  );
 
-  PlaceLabelsCompanion _labelToDb(StoredLabel l) =>
+  PlaceLabelsCompanion _labelInsertCompanion(StoredLabel label) =>
       PlaceLabelsCompanion.insert(
-        displayName: l.displayName,
-        category: Value(l.category),
-        isBasePlace: Value(l.isBasePlace),
-        createdAt: l.createdAt,
-        updatedAt: l.updatedAt,
+        displayName: label.displayName,
+        category: Value(label.category),
+        isBasePlace: Value(label.isBasePlace),
+        createdAt: label.createdAt,
+        updatedAt: label.updatedAt,
       );
 
-  StoredLabel _labelToDomain(PlaceLabelRow r) => StoredLabel(
-        id: r.id,
-        displayName: r.displayName,
-        category: r.category,
-        isBasePlace: r.isBasePlace,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
+  PlaceLabelsCompanion _labelUpdateCompanion(StoredLabel label) =>
+      PlaceLabelsCompanion(
+        displayName: Value(label.displayName),
+        category: Value(label.category),
+        isBasePlace: Value(label.isBasePlace),
+        createdAt: Value(label.createdAt),
+        updatedAt: Value(label.updatedAt),
       );
 
-  DailySummariesCompanion _dailyToDb(DailySummaryRecord d) =>
+  StoredLabel _labelToDomain(PlaceLabelRow row) => StoredLabel(
+    id: row.id,
+    displayName: row.displayName,
+    category: row.category,
+    isBasePlace: row.isBasePlace,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  );
+
+  DailySummariesCompanion _dailyToDb(DailySummaryRecord summary) =>
       DailySummariesCompanion.insert(
-        localDate: d.localDate,
-        outingFlag: d.outingFlag,
-        visitCount: d.visitCount,
-        clusterCount: d.clusterCount,
-        distanceM: d.distanceM,
+        localDate: summary.localDate,
+        outingFlag: summary.outingFlag,
+        visitCount: summary.visitCount,
+        clusterCount: summary.clusterCount,
+        distanceM: summary.distanceM,
         distanceMethod: 'mixed',
-        firstAt: Value(d.firstAt),
-        lastAt: Value(d.lastAt),
+        firstAt: Value(summary.firstAt),
+        lastAt: Value(summary.lastAt),
         quality: 0,
       );
 
-  DailySummaryRecord _dailyToDomain(DailySummaryRow r) => DailySummaryData(
-        localDate: r.localDate,
-        outingFlag: r.outingFlag,
-        visitCount: r.visitCount,
-        clusterCount: r.clusterCount,
-        distanceM: r.distanceM,
-        firstAt: r.firstAt,
-        lastAt: r.lastAt,
-      );
+  DailySummaryRecord _dailyToDomain(DailySummaryRow row) => DailySummaryData(
+    localDate: row.localDate,
+    outingFlag: row.outingFlag,
+    visitCount: row.visitCount,
+    clusterCount: row.clusterCount,
+    distanceM: row.distanceM,
+    firstAt: row.firstAt,
+    lastAt: row.lastAt,
+  );
 
-  MonthlySummariesCompanion _monthlyToDb(MonthlySummaryRecord m) =>
+  MonthlySummariesCompanion _monthlyToDb(MonthlySummaryRecord summary) =>
       MonthlySummariesCompanion.insert(
-        yearMonth: m.yearMonth,
-        outingDays: m.outingDays,
-        distanceM: m.distanceM,
-        uniqueClusters: m.uniqueClusters,
-        newClusters: m.newClusters,
-        maxDistanceDate: Value(m.maxDistanceDate),
-        calculatedAt: m.calculatedAt,
-        clusterIdsJson: Value(m.clusterIds.join(',')),
+        yearMonth: summary.yearMonth,
+        outingDays: summary.outingDays,
+        distanceM: summary.distanceM,
+        uniqueClusters: summary.uniqueClusters,
+        newClusters: summary.newClusters,
+        maxDistanceDate: Value(summary.maxDistanceDate),
+        calculatedAt: summary.calculatedAt,
+        clusterIdsJson: Value(summary.clusterIds.join(',')),
       );
 
-  MonthlySummaryRecord _monthlyToDomain(MonthlySummaryRow r) =>
+  MonthlySummaryRecord _monthlyToDomain(MonthlySummaryRow row) =>
       MonthlySummaryData(
-        yearMonth: r.yearMonth,
-        outingDays: r.outingDays,
-        distanceM: r.distanceM,
-        uniqueClusters: r.uniqueClusters,
-        newClusters: r.newClusters,
-        maxDistanceDate: r.maxDistanceDate,
-        calculatedAt: r.calculatedAt,
-        clusterIds: r.clusterIdsJson.isEmpty
+        yearMonth: row.yearMonth,
+        outingDays: row.outingDays,
+        distanceM: row.distanceM,
+        uniqueClusters: row.uniqueClusters,
+        newClusters: row.newClusters,
+        maxDistanceDate: row.maxDistanceDate,
+        calculatedAt: row.calculatedAt,
+        clusterIds: row.clusterIdsJson.isEmpty
             ? const {}
-            : r.clusterIdsJson
-                .split(',')
-                .where((s) => s.isNotEmpty)
-                .map(int.parse)
-                .toSet(),
+            : row.clusterIdsJson
+                  .split(',')
+                  .where((value) => value.isNotEmpty)
+                  .map(int.parse)
+                  .toSet(),
       );
 
-  InsightsCompanion _insightToDb(StoredInsight i) => InsightsCompanion.insert(
-        periodKey: i.periodKey,
-        ruleId: i.ruleId,
-        severity: i.severity,
-        title: i.title,
-        body: i.body,
-        metricJson: i.metricJson,
-        createdAt: i.createdAt,
-        dismissed: Value(i.dismissed),
+  InsightsCompanion _insightToDb(StoredInsight insight) =>
+      InsightsCompanion.insert(
+        periodKey: insight.periodKey,
+        ruleId: insight.ruleId,
+        severity: insight.severity,
+        title: insight.title,
+        body: insight.body,
+        metricJson: insight.metricJson,
+        createdAt: insight.createdAt,
+        dismissed: Value(insight.dismissed),
       );
 
-  StoredInsight _insightToDomain(InsightRow r) => StoredInsight(
-        id: r.id,
-        periodKey: r.periodKey,
-        ruleId: r.ruleId,
-        severity: r.severity,
-        title: r.title,
-        body: r.body,
-        metricJson: r.metricJson,
-        createdAt: r.createdAt,
-        dismissed: r.dismissed,
-      );
+  StoredInsight _insightToDomain(InsightRow row) => StoredInsight(
+    id: row.id,
+    periodKey: row.periodKey,
+    ruleId: row.ruleId,
+    severity: row.severity,
+    title: row.title,
+    body: row.body,
+    metricJson: row.metricJson,
+    createdAt: row.createdAt,
+    dismissed: row.dismissed,
+  );
 
-  String _encodePath(List<LatLngE7> path) => path
-      .map((p) => '${p.latE7},${p.lngE7}')
-      .join(';');
+  String _encodePath(List<LatLngE7> path) =>
+      path.map((point) => '${point.latE7},${point.lngE7}').join(';');
 
-  List<LatLngE7> _decodePath(String? s) {
-    if (s == null || s.isEmpty) return const [];
-    final out = <LatLngE7>[];
-    for (final pair in s.split(';')) {
+  List<LatLngE7> _decodePath(String? value) {
+    if (value == null || value.isEmpty) return const [];
+    final path = <LatLngE7>[];
+    for (final pair in value.split(';')) {
       final parts = pair.split(',');
-      if (parts.length == 2) {
-        final lat = int.tryParse(parts[0]);
-        final lng = int.tryParse(parts[1]);
-        if (lat != null && lng != null) out.add(LatLngE7(lat, lng));
+      if (parts.length != 2) continue;
+      final latitude = int.tryParse(parts[0]);
+      final longitude = int.tryParse(parts[1]);
+      if (latitude != null && longitude != null) {
+        path.add(LatLngE7(latitude, longitude));
       }
     }
-    return out;
+    return path;
   }
 }

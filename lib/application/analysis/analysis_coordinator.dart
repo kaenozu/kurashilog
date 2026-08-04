@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:isolate';
 
 import '../../domain/models/data_quality.dart';
@@ -12,11 +13,6 @@ import '../models/persistence_models.dart';
 import '../repositories/kurashilog_repository.dart';
 import 'window.dart';
 
-/// 分析の再構築コーディネーター（設計書 M04 / M05 / M06 / 6.1〜6.5）。
-///
-/// インポート成功後に、影響範囲のクラスタ・日次/月次サマリー・
-/// インサイトを再計算する。クラスタ計算は Isolate で実行し、
-/// メイン UI を止めない（設計書 10.1）。
 class AnalysisCoordinator {
   const AnalysisCoordinator({
     required this.repository,
@@ -34,20 +30,16 @@ class AnalysisCoordinator {
   final InsightEngine insights;
   final DistanceService distance;
 
-  /// インポート後に呼ぶ。全期間を再構築する（決定性・単純さを優先）。
   Future<void> rebuildAll() async {
     await _rebuildClusters();
     await _rebuildAllSummaries();
     await _rebuildInsights();
   }
 
-  /// 地点ラベル・除外変更後に呼ぶ（クラスタは据え置き、集計のみ再計算）。
   Future<void> rebuildSummariesAndInsights() async {
     await _rebuildAllSummaries();
     await _rebuildInsights();
   }
-
-  // --- クラスタ ---
 
   Future<void> _rebuildClusters() async {
     final visits = await repository.allVisits();
@@ -57,230 +49,252 @@ class AnalysisCoordinator {
     }
 
     final samples = visits
-        .map((v) => ClusteringService.VisitSample(
-              coord: v.latLng,
-              dwellSeconds: v.endAtUtc
-                  .difference(v.startAtUtc)
-                  .inSeconds
-                  .clamp(0, 1 << 31),
-              at: v.startAtUtc,
-            ))
+        .map(
+          (visit) => VisitSample(
+            coord: visit.latLng,
+            dwellSeconds: visit.endAtUtc
+                .difference(visit.startAtUtc)
+                .inSeconds
+                .clamp(0, 1 << 31)
+                .toInt(),
+            at: visit.startAtUtc,
+          ),
+        )
         .toList();
+    final localClustering = clustering;
+    final clusters = await Isolate.run(() => localClustering.cluster(samples));
 
-    // Isolate でクラスタ計算（純粋関数）。
-    final clusters = await Isolate.run(() => clustering.cluster(samples));
-
-    await repository.replaceAllClusters(clusters
-        .map((c) => StoredCluster(
+    await repository.replaceAllClusters(
+      clusters
+          .map(
+            (cluster) => StoredCluster(
               id: 0,
-              stableKey: c.stableKey,
-              centroidLatE7: c.centroidLatE7,
-              centroidLngE7: c.centroidLngE7,
-              radiusM: c.radiusM,
-              visitCount: c.visitCount,
-              dwellSeconds: c.dwellSeconds,
-              firstAt: c.firstAt,
-              lastAt: c.lastAt,
-            ))
-        .toList());
+              stableKey: cluster.stableKey,
+              centroidLatE7: cluster.centroidLatE7,
+              centroidLngE7: cluster.centroidLngE7,
+              radiusM: cluster.radiusM,
+              visitCount: cluster.visitCount,
+              dwellSeconds: cluster.dwellSeconds,
+              firstAt: cluster.firstAt,
+              lastAt: cluster.lastAt,
+            ),
+          )
+          .toList(),
+    );
 
-    // 訪問ごとに最も近いクラスタを割り当てる。
     final stored = await repository.allClusters();
     if (stored.isEmpty) return;
     final assignments = <int, int>{};
-    for (final v in visits) {
-      var bestId = stored.first.id;
-      var bestD = double.infinity;
-      for (final c in stored) {
-        final d = distance.haversineMeters(v.latLng, c.centroid);
-        if (d < bestD) {
-          bestD = d;
-          bestId = c.id;
+    for (final visit in visits) {
+      var best = stored.first;
+      var bestDistance = distance.haversineMeters(visit.latLng, best.centroid);
+      for (final cluster in stored.skip(1)) {
+        final candidateDistance = distance.haversineMeters(
+          visit.latLng,
+          cluster.centroid,
+        );
+        if (candidateDistance < bestDistance) {
+          best = cluster;
+          bestDistance = candidateDistance;
         }
       }
-      assignments[v.id] = bestId;
+      assignments[visit.id] = best.id;
     }
     await repository.assignVisitClusterIds(assignments);
   }
-
-  // --- 日次・月次サマリー ---
 
   Future<void> _rebuildAllSummaries() async {
     final earliest = await repository.earliestActivityAt();
     final latest = await repository.latestActivityAt();
     if (earliest == null || latest == null) return;
 
-    final firstMonth = DateTime(earliest.toLocal().year, earliest.toLocal().month);
+    var month = DateTime(earliest.toLocal().year, earliest.toLocal().month);
     final lastMonth = DateTime(latest.toLocal().year, latest.toLocal().month);
-
-    var m = firstMonth;
-    while (!m.isAfter(lastMonth)) {
-      await _rebuildMonth(m);
-      m = DateTime(m.year, m.month + 1);
+    while (!month.isAfter(lastMonth)) {
+      await _rebuildMonth(month);
+      month = DateTime(month.year, month.month + 1);
     }
   }
 
   Future<void> _rebuildMonth(DateTime monthLocal) async {
-    final ym = SummaryService.yearMonthOf(monthLocal);
-    final monthStartUtc = DateTime(monthLocal.year, monthLocal.month, 1).toUtc();
-    final nextMonthStartUtc =
-        DateTime(monthLocal.year, monthLocal.month + 1, 1).toUtc();
+    final yearMonth = SummaryService.yearMonthOf(monthLocal);
+    final monthStartUtc = DateTime(
+      monthLocal.year,
+      monthLocal.month,
+      1,
+    ).toUtc();
+    final nextMonthStartUtc = DateTime(
+      monthLocal.year,
+      monthLocal.month + 1,
+      1,
+    ).toUtc();
 
-    final visits = await repository.visitsInRange(monthStartUtc, nextMonthStartUtc);
-    final movements =
-        await repository.movementsInRange(monthStartUtc, nextMonthStartUtc);
+    final visits = await repository.visitsInRange(
+      monthStartUtc,
+      nextMonthStartUtc,
+    );
+    final movements = await repository.movementsInRange(
+      monthStartUtc,
+      nextMonthStartUtc,
+    );
 
-    // 基準地点（ユーザー確認済みラベル）を特定
     final labels = await repository.allLabels();
     final clusters = await repository.allClusters();
-    final excludedIds =
-        clusters.where((c) => c.excluded).map((c) => c.id).toSet();
-    final baseLabel = labels.where((l) => l.isBasePlace).firstOrNull;
-    int? baseClusterId;
-    if (baseLabel != null) {
-      baseClusterId =
-          clusters.where((c) => c.labelId == baseLabel.id).firstOrNull?.id;
-    }
-    final hasBasePlace = baseClusterId != null;
+    final excludedIds = clusters
+        .where((cluster) => cluster.excluded)
+        .map((c) => c.id)
+        .toSet();
+    final baseLabel = labels.where((label) => label.isBasePlace).firstOrNull;
+    final baseCluster = baseLabel == null
+        ? null
+        : clusters
+              .where((cluster) => cluster.labelId == baseLabel.id)
+              .firstOrNull;
 
-    // ローカル日ごとにグループ化
-    final byDate = <String, List<StoredVisit>>{};
-    for (final v in visits) {
-      final local = v.startAtUtc.toLocal();
+    final visitsByDate = <String, List<StoredVisit>>{};
+    for (final visit in visits) {
+      final local = visit.startAtUtc.toLocal();
       if (local.year != monthLocal.year || local.month != monthLocal.month) {
         continue;
       }
-      byDate
+      visitsByDate
           .putIfAbsent(SummaryService.localDateOf(local), () => [])
-          .add(v);
+          .add(visit);
     }
-    final mByDate = <String, List<StoredMovement>>{};
-    for (final mv in movements) {
-      final local = mv.startAtUtc.toLocal();
+
+    final movementsByDate = <String, List<StoredMovement>>{};
+    for (final movement in movements) {
+      final local = movement.startAtUtc.toLocal();
       if (local.year != monthLocal.year || local.month != monthLocal.month) {
         continue;
       }
-      mByDate.putIfAbsent(SummaryService.localDateOf(local), () => []).add(mv);
+      movementsByDate
+          .putIfAbsent(SummaryService.localDateOf(local), () => [])
+          .add(movement);
     }
 
-    // 全ローカル日を列挙（記録が無い日も 0 サマリーを作る）
-    final allDates = <String>{...byDate.keys, ...mByDate.keys};
-    final daysInMonth = DateTime(monthLocal.year, monthLocal.month + 1, 0).day;
-    for (var d = 1; d <= daysInMonth; d++) {
-      allDates.add(SummaryService.localDateOf(
-          DateTime(monthLocal.year, monthLocal.month, d)));
-    }
+    // データの無い日を「在宅日」として生成しない。
+    final recordedDates = <String>{
+      ...visitsByDate.keys,
+      ...movementsByDate.keys,
+    }.toList()..sort();
 
     final daily = <DailySummaryData>[];
-    for (final date in allDates.toList()..sort()) {
-      final dayVisits = byDate[date] ?? const [];
-      final dayMovements = mByDate[date] ?? const [];
-      daily.add(summaries.computeDaily(
-        localDate: date,
-        visits: dayVisits
-            .map((v) => DailyVisitInput(
-                  startAtUtc: v.startAtUtc,
-                  endAtUtc: v.endAtUtc,
-                  clusterId: v.clusterId,
+    for (final date in recordedDates) {
+      final dayVisits = visitsByDate[date] ?? const [];
+      final dayMovements = movementsByDate[date] ?? const [];
+      daily.add(
+        summaries.computeDaily(
+          localDate: date,
+          visits: dayVisits
+              .map(
+                (visit) => DailyVisitInput(
+                  startAtUtc: visit.startAtUtc,
+                  endAtUtc: visit.endAtUtc,
+                  clusterId: visit.clusterId,
                   excluded:
-                      v.clusterId != null && excludedIds.contains(v.clusterId!),
+                      visit.clusterId != null &&
+                      excludedIds.contains(visit.clusterId),
                   outsideBasePlace:
-                      hasBasePlace && v.clusterId != baseClusterId,
-                ))
-            .toList(),
-        movements: dayMovements
-            .map((m) => DailyMovementInput(
-                  startAtUtc: m.startAtUtc,
-                  endAtUtc: m.endAtUtc,
-                  distanceM: m.distanceM ?? 0,
-                  isValidDistance: m.validDistance && m.distanceM != null,
-                ))
-            .toList(),
-        hasBasePlace: hasBasePlace,
-      ));
+                      baseCluster != null && visit.clusterId != baseCluster.id,
+                ),
+              )
+              .toList(),
+          movements: dayMovements
+              .map(
+                (movement) => DailyMovementInput(
+                  startAtUtc: movement.startAtUtc,
+                  endAtUtc: movement.endAtUtc,
+                  distanceM: movement.distanceM ?? 0,
+                  isValidDistance:
+                      movement.validDistance && movement.distanceM != null,
+                ),
+              )
+              .toList(),
+          hasBasePlace: baseCluster != null,
+        ),
+      );
     }
 
+    // 古い計算結果を残さない。
+    await repository.invalidateSummariesAfter('$yearMonth-01');
     await repository.upsertDailySummaries(daily);
 
-    // 前月のクラスタ集合
-    final prev = await repository.monthlySummary(
-        SummaryService.yearMonthOf(
-            DateTime(monthLocal.year, monthLocal.month - 1)));
+    final previousMonth = SummaryService.yearMonthOf(
+      DateTime(monthLocal.year, monthLocal.month - 1),
+    );
+    final previous = await repository.monthlySummary(previousMonth);
     final monthly = summaries.computeMonthly(
-      yearMonth: ym,
+      yearMonth: yearMonth,
       days: daily,
-      previousClusterIds: prev?.clusterIds ?? const {},
+      previousClusterIds: previous?.clusterIds ?? const {},
       calculatedAt: DateTime.now(),
     );
     await repository.upsertMonthlySummaries([monthly]);
   }
 
-  // --- インサイト ---
-
   Future<void> _rebuildInsights() async {
     final latest = await repository.latestActivityAt();
     if (latest == null) return;
-
     final window = computeComparisonWindow(latest.toLocal());
-
-    final ctx = await _buildInsightContext(
+    final context = await _buildInsightContext(
       currentStart: window.currentStart,
       currentEnd: window.currentEnd,
       previousStart: window.previousStart,
       previousEnd: window.previousEnd,
       quality: freshness
-          .evaluate(FreshnessInput(
-            nowLocalDate: DateTime.now(),
-            latestImportedAt: latest,
-          ))
+          .evaluate(
+            FreshnessInput(
+              nowLocalDate: DateTime.now(),
+              latestImportedAt: latest,
+            ),
+          )
           .quality,
     );
-
-    final selected = insights.selectForMonthStory(ctx);
-
+    final selected = insights.selectForMonthStory(context);
     await repository.replaceInsightsForPeriod(
       window.periodKey,
       selected
-          .map((i) => StoredInsight(
-                id: 0,
-                periodKey: window.periodKey,
-                ruleId: i.ruleId,
-                severity: i.severity.name,
-                title: i.title,
-                body: i.body,
-                metricJson: _jsonEncode(i.metricJson),
-                createdAt: DateTime.now(),
-              ))
+          .map(
+            (insight) => StoredInsight(
+              id: 0,
+              periodKey: window.periodKey,
+              ruleId: insight.ruleId,
+              severity: insight.severity.name,
+              title: insight.title,
+              body: insight.body,
+              metricJson: jsonEncode(insight.metricJson),
+              createdAt: DateTime.now(),
+            ),
+          )
           .toList(),
     );
   }
 
-  /// 月間ストーリー用: 選択月 vs 前月のインサイト（最大 8 件）。
   Future<List<InsightData>> insightsForMonth(String yearMonth) async {
     final parts = yearMonth.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
-    final monthStart = DateTime(year, month, 1);
-    final monthEnd = DateTime(year, month + 1, 1);
-    final prevStart = DateTime(year, month - 1, 1);
-    final prevEnd = monthStart;
-
+    final currentStart = DateTime(year, month);
+    final currentEnd = DateTime(year, month + 1);
+    final previousStart = DateTime(year, month - 1);
     final latest = await repository.latestActivityAt();
     final quality = freshness
-        .evaluate(FreshnessInput(
-          nowLocalDate: DateTime.now(),
-          latestImportedAt: latest,
-        ))
+        .evaluate(
+          FreshnessInput(
+            nowLocalDate: DateTime.now(),
+            latestImportedAt: latest,
+          ),
+        )
         .quality;
-
-    final ctx = await _buildInsightContext(
-      currentStart: monthStart,
-      currentEnd: monthEnd,
-      previousStart: prevStart,
-      previousEnd: prevEnd,
+    final context = await _buildInsightContext(
+      currentStart: currentStart,
+      currentEnd: currentEnd,
+      previousStart: previousStart,
+      previousEnd: currentStart,
       quality: quality,
     );
-    return insights.selectForMonthStory(ctx);
+    return insights.selectForMonthStory(context);
   }
 
   Future<InsightContext> _buildInsightContext({
@@ -290,102 +304,116 @@ class AnalysisCoordinator {
     required DateTime previousEnd,
     required DataQuality quality,
   }) async {
-    final currentUtc = (currentStart.toUtc(), currentEnd.toUtc());
-    final previousUtc = (previousStart.toUtc(), previousEnd.toUtc());
-
-    final currentVisits =
-        await repository.visitsInRange(currentUtc.$1, currentUtc.$2);
-    final previousVisits =
-        await repository.visitsInRange(previousUtc.$1, previousUtc.$2);
-    final currentMovements =
-        await repository.movementsInRange(currentUtc.$1, currentUtc.$2);
-    final previousMovements =
-        await repository.movementsInRange(previousUtc.$1, previousUtc.$2);
+    final currentVisits = await repository.visitsInRange(
+      currentStart.toUtc(),
+      currentEnd.toUtc(),
+    );
+    final previousVisits = await repository.visitsInRange(
+      previousStart.toUtc(),
+      previousEnd.toUtc(),
+    );
+    final currentMovements = await repository.movementsInRange(
+      currentStart.toUtc(),
+      currentEnd.toUtc(),
+    );
+    final previousMovements = await repository.movementsInRange(
+      previousStart.toUtc(),
+      previousEnd.toUtc(),
+    );
 
     final clusters = await repository.allClusters();
-    final excludedIds = clusters.where((c) => c.excluded).map((c) => c.id).toSet();
+    final excludedIds = clusters
+        .where((cluster) => cluster.excluded)
+        .map((c) => c.id)
+        .toSet();
     final labels = await repository.allLabels();
-    final baseLabel = labels.where((l) => l.isBasePlace).firstOrNull;
+    final baseLabel = labels.where((label) => label.isBasePlace).firstOrNull;
     final baseCluster = baseLabel == null
         ? null
-        : clusters.where((c) => c.labelId == baseLabel.id).firstOrNull;
+        : clusters
+              .where((cluster) => cluster.labelId == baseLabel.id)
+              .firstOrNull;
 
-    final currentDays = _toLocalDays(currentVisits, currentMovements, excludedIds);
-    final previousDays =
-        _toLocalDays(previousVisits, previousMovements, excludedIds);
+    int sumDistance(List<StoredMovement> values) => values
+        .where(
+          (movement) => movement.validDistance && movement.distanceM != null,
+        )
+        .fold(0, (sum, movement) => sum + movement.distanceM!);
 
-    int sumDistance(List<StoredMovement> ms) => ms
-        .where((m) => m.validDistance && m.distanceM != null)
-        .fold(0, (a, m) => a + m.distanceM!);
-
-    // クラスタ別訪問回数
-    Map<int, int> clusterCounts(List<StoredVisit> vs) {
-      final m = <int, int>{};
-      for (final v in vs) {
-        final id = v.clusterId;
+    Map<int, int> clusterCounts(List<StoredVisit> values) {
+      final result = <int, int>{};
+      for (final visit in values) {
+        final id = visit.clusterId;
         if (id == null || excludedIds.contains(id)) continue;
-        m[id] = (m[id] ?? 0) + 1;
+        result[id] = (result[id] ?? 0) + 1;
       }
-      return m;
+      return result;
     }
 
     final currentCounts = clusterCounts(currentVisits);
     final previousCounts = clusterCounts(previousVisits);
+    final newClusters = currentCounts.keys
+        .where((id) => !previousCounts.containsKey(id))
+        .length;
 
-    // 新規地点: 現期間に訪問があり、前期間に訪問がないクラスタ
-    final newClusters =
-        currentCounts.keys.where((id) => !previousCounts.containsKey(id)).length;
-
-    // 平日の基準地点帰着時刻（中央値）
-    int? medianReturn(List<StoredVisit> vs, {required bool weekdays}) {
+    int? medianReturn(List<StoredVisit> values) {
+      if (baseCluster == null) return null;
       final perDay = <String, int>{};
-      for (final v in vs) {
-        final local = v.startAtUtc.toLocal();
-        final isWeekday = local.weekday <= 5;
-        if (isWeekday != weekdays) continue;
-        if (baseCluster == null || v.clusterId != baseCluster.id) continue;
+      for (final visit in values) {
+        final local = visit.startAtUtc.toLocal();
+        if (local.weekday > DateTime.friday ||
+            visit.clusterId != baseCluster.id) {
+          continue;
+        }
         final key = SummaryService.localDateOf(local);
         final minutes = local.hour * 60 + local.minute;
-        final cur = perDay[key];
-        if (cur == null || minutes > cur) perDay[key] = minutes;
+        final previous = perDay[key];
+        if (previous == null || minutes > previous) perDay[key] = minutes;
       }
       if (perDay.length < 5) return null;
-      final values = perDay.values.toList()..sort();
-      return values[values.length ~/ 2];
+      final sorted = perDay.values.toList()..sort();
+      return sorted[sorted.length ~/ 2];
     }
 
-    // 休日の活動半径（基準地点からの中央距離）
-    int? medianHolidayRadius(List<StoredVisit> vs, {required bool holidays}) {
+    int? medianHolidayRadius(List<StoredVisit> values) {
       if (baseCluster == null) return null;
-      final baseCoord = baseCluster.centroid;
-      final dists = <int>[];
-      for (final v in vs) {
-        final local = v.startAtUtc.toLocal();
-        final isHoliday = local.weekday == DateTime.saturday ||
+      final distances = <int>[];
+      for (final visit in values) {
+        final local = visit.startAtUtc.toLocal();
+        final holiday =
+            local.weekday == DateTime.saturday ||
             local.weekday == DateTime.sunday;
-        if (isHoliday != holidays) continue;
-        if (v.clusterId == baseCluster.id) continue;
-        if (excludedIds.contains(v.clusterId)) continue;
-        dists.add(distance.haversineMeters(v.latLng, baseCoord).round());
+        if (!holiday ||
+            visit.clusterId == baseCluster.id ||
+            excludedIds.contains(visit.clusterId)) {
+          continue;
+        }
+        distances.add(
+          distance.haversineMeters(visit.latLng, baseCluster.centroid).round(),
+        );
       }
-      if (dists.length < 5) return null;
-      dists.sort();
-      return dists[dists.length ~/ 2];
+      if (distances.length < 5) return null;
+      distances.sort();
+      return distances[distances.length ~/ 2];
     }
 
-    final clusterNames = <int, String>{
-      for (final c in clusters) c.id: c.displayName,
-    };
-    final clusterCentroids = <int, (int, int)>{
-      for (final c in clusters) c.id: (c.centroidLatE7, c.centroidLngE7),
-    };
+    final currentDays = _toLocalDays(
+      currentVisits,
+      currentMovements,
+      excludedIds,
+    );
+    final previousDays = _toLocalDays(
+      previousVisits,
+      previousMovements,
+      excludedIds,
+    );
 
     return InsightContext(
       quality: quality,
-      currentDayCount: currentDays.length,
-      previousDayCount: previousDays.length,
-      currentOutingDays: currentDays.values.where((o) => o).length,
-      previousOutingDays: previousDays.values.where((o) => o).length,
+      currentDayCount: currentEnd.difference(currentStart).inDays,
+      previousDayCount: previousEnd.difference(previousStart).inDays,
+      currentOutingDays: currentDays.values.where((value) => value).length,
+      previousOutingDays: previousDays.values.where((value) => value).length,
       currentDistanceM: sumDistance(currentMovements),
       previousDistanceM: sumDistance(previousMovements),
       newClusterCount: newClusters,
@@ -394,52 +422,37 @@ class AnalysisCoordinator {
       baseClusterId: baseCluster?.id,
       baseCentroidLatE7: baseCluster?.centroidLatE7,
       baseCentroidLngE7: baseCluster?.centroidLngE7,
-      clusterCentroids: clusterCentroids,
-      clusterNames: clusterNames,
-      currentWeekdayReturnMinutes: medianReturn(currentVisits, weekdays: true),
-      previousWeekdayReturnMinutes:
-          medianReturn(previousVisits, weekdays: true),
-      currentHolidayRadiusM: medianHolidayRadius(currentVisits, holidays: true),
-      previousHolidayRadiusM:
-          medianHolidayRadius(previousVisits, holidays: true),
+      clusterCentroids: {
+        for (final cluster in clusters)
+          cluster.id: (cluster.centroidLatE7, cluster.centroidLngE7),
+      },
+      clusterNames: {
+        for (final cluster in clusters) cluster.id: cluster.displayName,
+      },
+      currentWeekdayReturnMinutes: medianReturn(currentVisits),
+      previousWeekdayReturnMinutes: medianReturn(previousVisits),
+      currentHolidayRadiusM: medianHolidayRadius(currentVisits),
+      previousHolidayRadiusM: medianHolidayRadius(previousVisits),
     );
   }
 
-  /// ローカル日 → 外出フラグ のマップ。
   Map<String, bool> _toLocalDays(
     List<StoredVisit> visits,
     List<StoredMovement> movements,
     Set<int> excludedIds,
   ) {
     final days = <String, bool>{};
-    for (final v in visits) {
-      if (v.clusterId != null && excludedIds.contains(v.clusterId)) continue;
-      final d = SummaryService.localDateOf(v.startAtUtc.toLocal());
-      days[d] = true;
+    for (final visit in visits) {
+      if (visit.clusterId != null && excludedIds.contains(visit.clusterId)) {
+        continue;
+      }
+      days[SummaryService.localDateOf(visit.startAtUtc.toLocal())] = true;
     }
-    for (final m in movements) {
-      if (!m.validDistance) continue;
-      final d = SummaryService.localDateOf(m.startAtUtc.toLocal());
-      days[d] = true;
+    for (final movement in movements) {
+      if (!movement.validDistance) continue;
+      days[SummaryService.localDateOf(movement.startAtUtc.toLocal())] = true;
     }
     return days;
-  }
-
-  String _jsonEncode(Map<String, Object?> m) {
-    final buf = StringBuffer('{');
-    var first = true;
-    m.forEach((k, v) {
-      if (!first) buf.write(',');
-      first = false;
-      buf.write('"$k":');
-      if (v is String) {
-        buf.write('"${v.replaceAll('"', r'\"')}"');
-      } else {
-        buf.write(v.toString());
-      }
-    });
-    buf.write('}');
-    return buf.toString();
   }
 }
 

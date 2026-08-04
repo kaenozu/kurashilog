@@ -12,8 +12,7 @@ import 'package:flutter/services.dart';
 /// （元データを永続化しない、設計書 5.1 手順 1・8.1）。
 class AppPlatform {
   AppPlatform({MethodChannel? channel})
-      : _channel = channel ??
-            const MethodChannel('kurashilog/platform');
+    : _channel = channel ?? const MethodChannel('kurashilog/platform');
 
   final MethodChannel _channel;
 

@@ -26,11 +26,18 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
-  /// アプリ領域の DB を開く（テストではオーバーライドする）。
-  static Future<AppDatabase> open() async {
-    final dir = await getApplicationSupportDirectory();
-    await dir.create(recursive: true);
-    final file = File(p.join(dir.path, 'kurashilog.sqlite'));
+  static Future<String> defaultPath() async {
+    final directory = await getApplicationSupportDirectory();
+    await directory.create(recursive: true);
+    return p.join(directory.path, 'kurashilog.sqlite');
+  }
+
+  /// アプリ領域のDBを開く（テストではパスを指定できる）。
+  static Future<AppDatabase> open() async => openAtPath(await defaultPath());
+
+  static Future<AppDatabase> openAtPath(String path) async {
+    final file = File(path);
+    await file.parent.create(recursive: true);
     return AppDatabase(NativeDatabase.createInBackground(file));
   }
 
@@ -39,8 +46,12 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+    },
+    beforeOpen: (details) async {
+      await customStatement('PRAGMA journal_mode = wal;');
+      await customStatement('PRAGMA synchronous = normal;');
+    },
+  );
 }

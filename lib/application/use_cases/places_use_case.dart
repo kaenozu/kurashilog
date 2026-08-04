@@ -54,34 +54,40 @@ class PlacesUseCase {
       labelId = cluster.labelId!;
       final existing = await repository.labelById(labelId);
       if (existing != null) {
-        await repository.updateLabel(StoredLabel(
-          id: existing.id,
-          displayName: displayName.trim(),
-          category: category,
-          isBasePlace: isBasePlace,
-          createdAt: existing.createdAt,
-          updatedAt: now,
-        ));
+        await repository.updateLabel(
+          StoredLabel(
+            id: existing.id,
+            displayName: displayName.trim(),
+            category: category,
+            isBasePlace: isBasePlace,
+            createdAt: existing.createdAt,
+            updatedAt: now,
+          ),
+        );
       } else {
-        labelId = await repository.insertLabel(StoredLabel(
+        labelId = await repository.insertLabel(
+          StoredLabel(
+            id: 0,
+            displayName: displayName.trim(),
+            category: category,
+            isBasePlace: isBasePlace,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+        isNew = true;
+      }
+    } else {
+      labelId = await repository.insertLabel(
+        StoredLabel(
           id: 0,
           displayName: displayName.trim(),
           category: category,
           isBasePlace: isBasePlace,
           createdAt: now,
           updatedAt: now,
-        ));
-        isNew = true;
-      }
-    } else {
-      labelId = await repository.insertLabel(StoredLabel(
-        id: 0,
-        displayName: displayName.trim(),
-        category: category,
-        isBasePlace: isBasePlace,
-        createdAt: now,
-        updatedAt: now,
-      ));
+        ),
+      );
       isNew = true;
     }
 
@@ -92,14 +98,16 @@ class PlacesUseCase {
       final labels = await repository.allLabels();
       for (final l in labels) {
         if (l.id != labelId && l.isBasePlace) {
-          await repository.updateLabel(StoredLabel(
-            id: l.id,
-            displayName: l.displayName,
-            category: l.category,
-            isBasePlace: false,
-            createdAt: l.createdAt,
-            updatedAt: now,
-          ));
+          await repository.updateLabel(
+            StoredLabel(
+              id: l.id,
+              displayName: l.displayName,
+              category: l.category,
+              isBasePlace: false,
+              createdAt: l.createdAt,
+              updatedAt: now,
+            ),
+          );
         }
       }
     }

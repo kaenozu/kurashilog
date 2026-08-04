@@ -14,14 +14,13 @@ enum DistanceMethod {
 
   String get dbValue => name;
 
-  static DistanceMethod fromDb(String value) =>
-      DistanceMethod.values.firstWhere((m) => m.name == value,
-          orElse: () => DistanceMethod.unknown);
+  static DistanceMethod fromDb(String value) => DistanceMethod.values
+      .firstWhere((m) => m.name == value, orElse: () => DistanceMethod.unknown);
 
   String get displayLabel => switch (this) {
-        DistanceMethod.recorded => '記録値',
-        DistanceMethod.estimatedPath => '推定（経路）',
-        DistanceMethod.estimatedDirect => '推定（直線）',
-        DistanceMethod.unknown => '不明',
-      };
+    DistanceMethod.recorded => '記録値',
+    DistanceMethod.estimatedPath => '推定（経路）',
+    DistanceMethod.estimatedDirect => '推定（直線）',
+    DistanceMethod.unknown => '不明',
+  };
 }

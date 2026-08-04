@@ -6,14 +6,7 @@ import '../../infrastructure/parsers/timeline_parser.dart';
 import '../../infrastructure/platform/app_platform.dart';
 
 /// インポートフローのフェーズ。
-enum ImportPhase {
-  idle,
-  previewing,
-  previewReady,
-  importing,
-  done,
-  error,
-}
+enum ImportPhase { idle, previewing, previewReady, importing, done, error }
 
 class ImportFlowState {
   const ImportFlowState({
@@ -45,16 +38,15 @@ class ImportFlowState {
     String? errorCode,
     String? errorMessage,
     bool clearPath = false,
-  }) =>
-      ImportFlowState(
-        phase: phase ?? this.phase,
-        cachePath: clearPath ? null : (cachePath ?? this.cachePath),
-        preview: preview ?? this.preview,
-        progress: progress ?? this.progress,
-        result: result ?? this.result,
-        errorCode: errorCode ?? this.errorCode,
-        errorMessage: errorMessage ?? this.errorMessage,
-      );
+  }) => ImportFlowState(
+    phase: phase ?? this.phase,
+    cachePath: clearPath ? null : (cachePath ?? this.cachePath),
+    preview: preview ?? this.preview,
+    progress: progress ?? this.progress,
+    result: result ?? this.result,
+    errorCode: errorCode ?? this.errorCode,
+    errorMessage: errorMessage ?? this.errorMessage,
+  );
 }
 
 /// インポートフローの状態管理（設計書 M01 TimelineImport）。
@@ -87,26 +79,29 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
 
   /// プレビュー（DB は変更しない）。
   Future<void> preview(String cachePath) async {
-    _token = CancellationToken();
+    final token = CancellationToken();
+    _token?.cancel();
+    _token = token;
     state = ImportFlowState(
       phase: ImportPhase.previewing,
       cachePath: cachePath,
     );
-    final preview = await _useCase.previewFile(cachePath, token: _token);
-    if (!mounted) return;
-    if (!preview.ok) {
+
+    final result = await _useCase.previewFile(cachePath, token: token);
+    if (!identical(_token, token)) return;
+    if (!result.ok) {
       state = ImportFlowState(
         phase: ImportPhase.error,
         cachePath: cachePath,
-        errorCode: preview.errorCode,
-        errorMessage: preview.errorMessage,
+        errorCode: result.errorCode,
+        errorMessage: result.errorMessage,
       );
       return;
     }
     state = ImportFlowState(
       phase: ImportPhase.previewReady,
       cachePath: cachePath,
-      preview: preview,
+      preview: result,
     );
   }
 
@@ -114,27 +109,33 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
   Future<void> startImport() async {
     final path = state.cachePath;
     if (path == null) return;
-    _token = CancellationToken();
+
+    final preview = state.preview;
+    final token = CancellationToken();
+    _token?.cancel();
+    _token = token;
     state = ImportFlowState(
       phase: ImportPhase.importing,
       cachePath: path,
-      preview: state.preview,
+      preview: preview,
       progress: const ImportProgress(ImportStage.parsing, percent: 0),
     );
+
     final result = await _useCase.importFile(
       path,
-      token: _token,
-      onProgress: (p) {
-        if (!mounted) return;
+      token: token,
+      previewWarnings: preview?.warnings ?? const [],
+      onProgress: (progress) {
+        if (!identical(_token, token)) return;
         state = state.copyWith(
-          progress: p,
+          progress: progress,
           phase: ImportPhase.importing,
         );
       },
     );
-    if (!mounted) return;
+    if (!identical(_token, token)) return;
+
     if (result.ok) {
-      // ホーム等の再読込を促す
       ref.read(dashboardRefreshProvider.notifier).state++;
       await _cleanupCache();
       state = ImportFlowState(
@@ -153,26 +154,24 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
     }
   }
 
-  void cancel() {
-    _token?.cancel();
-  }
+  void cancel() => _token?.cancel();
 
   /// フローを閉じる（キャッシュも削除）。
   Future<void> dismiss() async {
+    _token?.cancel();
+    _token = null;
     await _cleanupCache();
     state = ImportFlowState.idle;
   }
 
   Future<void> _cleanupCache() async {
     final path = state.cachePath;
-    if (path != null) {
-      await deleteCacheFile(path);
-    }
+    if (path != null) await deleteCacheFile(path);
     state = state.copyWith(clearPath: true);
   }
 }
 
 final importFlowProvider =
     NotifierProvider<ImportFlowNotifier, ImportFlowState>(
-  ImportFlowNotifier.new,
-);
+      ImportFlowNotifier.new,
+    );

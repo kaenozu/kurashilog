@@ -1,0 +1,5 @@
+* text=auto
+*.dart text eol=lf
+*.dart.snapshot binary
+*.json text eol=lf
+*.yaml text eol=lf

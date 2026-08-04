@@ -1,8 +1,6 @@
 /// 日次・月次集計のドメイン値（設計書 6.3 / 10.1 キャッシュ戦略）。
 library;
 
-import 'data_quality.dart';
-
 /// 日次集計の入力（訪問）。
 class DailyVisitInput {
   const DailyVisitInput({
@@ -90,15 +88,15 @@ class MonthlySummaryData {
 
   /// 集計対象の月が 1 日も無い場合の空サマリー。
   factory MonthlySummaryData.empty(String yearMonth) => MonthlySummaryData(
-        yearMonth: yearMonth,
-        outingDays: 0,
-        distanceM: 0,
-        uniqueClusters: 0,
-        newClusters: 0,
-        maxDistanceDate: null,
-        calculatedAt: DateTime.now(),
-        clusterIds: const {},
-      );
+    yearMonth: yearMonth,
+    outingDays: 0,
+    distanceM: 0,
+    uniqueClusters: 0,
+    newClusters: 0,
+    maxDistanceDate: null,
+    calculatedAt: DateTime.now(),
+    clusterIds: const {},
+  );
 }
 
 /// メトリクスカードのアイコン種別（ドメインは Flutter に依存しない）。

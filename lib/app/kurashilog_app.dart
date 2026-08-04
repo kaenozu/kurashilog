@@ -25,8 +25,6 @@ class KurashilogApp extends ConsumerWidget {
 }
 
 /// オンボーディング未完了なら説明、完了ならメインシェル。
-///
-/// 起動時・復帰時に共有受信（ACTION_SEND）の確認も行う（FR-011）。
 class _RootGate extends ConsumerStatefulWidget {
   const _RootGate();
 
@@ -36,7 +34,8 @@ class _RootGate extends ConsumerStatefulWidget {
 
 class _RootGateState extends ConsumerState<_RootGate>
     with WidgetsBindingObserver {
-  bool _checkedShare = false;
+  bool _checkingShare = false;
+  bool _initialShareScheduled = false;
 
   @override
   void initState() {
@@ -55,26 +54,33 @@ class _RootGateState extends ConsumerState<_RootGate>
     if (state == AppLifecycleState.resumed) {
       _checkSharedFile();
     }
+    if (state == AppLifecycleState.detached) {
+      ref.read(appDatabaseHandleProvider).close();
+    }
   }
 
   Future<void> _checkSharedFile() async {
-    if (_checkedShare) return;
-    _checkedShare = true;
-    final notifier = ref.read(importFlowProvider.notifier);
-    final opened = await notifier.startFromShare();
-    if (opened && mounted) {
-      Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => const ImportFlowScreen(),
-      ));
+    if (_checkingShare || !mounted) return;
+    _checkingShare = true;
+    try {
+      final notifier = ref.read(importFlowProvider.notifier);
+      final opened = await notifier.startFromShare();
+      if (opened && mounted) {
+        await Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => const ImportFlowScreen()));
+      }
+    } finally {
+      _checkingShare = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final done = ref.watch(_onboardingDoneProvider);
-    if (!_checkedShare && done.valueOrNull == true) {
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _checkSharedFile());
+    if (!_initialShareScheduled && done.valueOrNull == true) {
+      _initialShareScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkSharedFile());
     }
 
     return done.when(
@@ -86,7 +92,6 @@ class _RootGateState extends ConsumerState<_RootGate>
   }
 }
 
-final _onboardingDoneProvider =
-    FutureProvider.autoDispose<bool>(
+final _onboardingDoneProvider = FutureProvider.autoDispose<bool>(
   (ref) => ref.watch(settingsUseCaseProvider).isOnboardingDone(),
 );

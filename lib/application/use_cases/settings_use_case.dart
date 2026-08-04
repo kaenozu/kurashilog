@@ -8,10 +8,7 @@ enum DistanceUnit { km, m }
 
 /// アプリ設定（設計書 FR-120 設定）。
 class AppSettingsData {
-  const AppSettingsData({
-    required this.weekStart,
-    required this.distanceUnit,
-  });
+  const AppSettingsData({required this.weekStart, required this.distanceUnit});
 
   final WeekStart weekStart;
   final DistanceUnit distanceUnit;
@@ -35,11 +32,15 @@ class SettingsUseCase {
     );
   }
 
-  Future<void> setWeekStart(WeekStart value) =>
-      repository.setSetting(_weekStartKey, value == WeekStart.sunday ? '0' : '1');
+  Future<void> setWeekStart(WeekStart value) => repository.setSetting(
+    _weekStartKey,
+    value == WeekStart.sunday ? '0' : '1',
+  );
 
-  Future<void> setDistanceUnit(DistanceUnit value) =>
-      repository.setSetting(_distanceUnitKey, value == DistanceUnit.m ? 'm' : 'km');
+  Future<void> setDistanceUnit(DistanceUnit value) => repository.setSetting(
+    _distanceUnitKey,
+    value == DistanceUnit.m ? 'm' : 'km',
+  );
 
   Future<bool> isOnboardingDone() async {
     final v = await repository.getSetting(_onboardingDoneKey);
