@@ -81,9 +81,11 @@ class AppDatabaseHandle {
 
       Object? originalError;
       StackTrace? originalStackTrace;
+      var databaseClosed = false;
       try {
         await _database.customStatement('PRAGMA wal_checkpoint(TRUNCATE);');
         await _database.close();
+        databaseClosed = true;
         await _completePendingReset(
           _databasePath,
           deleteFile: _deleteFile,
@@ -92,11 +94,16 @@ class AppDatabaseHandle {
         originalError = error;
         originalStackTrace = stackTrace;
         try {
+          if (!databaseClosed) {
+            await _database.close();
+            databaseClosed = true;
+          }
           await _completePendingReset(
             _databasePath,
             deleteFile: _deleteFile,
           );
         } catch (recoveryError) {
+          _closed = true;
           throw DatabaseResetException(
             'データベースの物理削除と復旧に失敗しました',
             recoveryError,
@@ -104,7 +111,16 @@ class AppDatabaseHandle {
         }
       }
 
-      _database = await _opener(_databasePath);
+      try {
+        _database = await _opener(_databasePath);
+      } catch (reopenError) {
+        _closed = true;
+        throw DatabaseResetException(
+          'データベース削除後の再初期化に失敗しました',
+          reopenError,
+        );
+      }
+
       if (originalError != null) {
         Error.throwWithStackTrace(
           DatabaseResetException('データベースの物理削除に失敗しました', originalError),
