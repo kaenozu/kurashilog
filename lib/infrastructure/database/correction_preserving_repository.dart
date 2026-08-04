@@ -2,12 +2,11 @@ import '../../application/models/persistence_models.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/services/clustering_service.dart';
 import '../../domain/services/distance_service.dart';
-import 'app_database.dart';
 import 'kurashilog_repository_impl.dart';
 
 /// Ensures a previous correction is inherited by at most one rebuilt cluster.
 class CorrectionPreservingRepository extends KurashilogRepositoryImpl {
-  CorrectionPreservingRepository(AppDatabase database) : super(database);
+  CorrectionPreservingRepository(super.database);
 
   @override
   Future<void> replaceAllClusters(List<StoredCluster> clusters) async {
