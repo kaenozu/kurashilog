@@ -8,7 +8,7 @@ import 'package:kurashilog/application/repositories/kurashilog_repository.dart';
 import 'package:kurashilog/application/use_cases/import_use_case.dart';
 import 'package:kurashilog/domain/models/normalized_record.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
-import 'package:kurashilog/infrastructure/database/correction_preserving_repository.dart';
+import 'package:kurashilog/infrastructure/database/kurashilog_repository_impl.dart';
 import 'package:kurashilog/infrastructure/parsers/record_validator.dart';
 import 'package:kurashilog/infrastructure/parsers/timeline_parser.dart';
 import 'package:kurashilog/infrastructure/platform/app_platform.dart';
@@ -47,7 +47,7 @@ void main() {
       await source.writeAsString('{}');
 
       final database = AppDatabase(NativeDatabase.memory());
-      final repository = CorrectionPreservingRepository(database);
+      final repository = KurashilogRepositoryImpl(database);
       final token = CancellationToken();
       final analysis = _CancellingAnalysis(
         repository: repository,
