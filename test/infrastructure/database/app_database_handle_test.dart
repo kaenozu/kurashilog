@@ -13,7 +13,8 @@ void main() {
 
   setUp(() async {
     directory = await Directory.systemTemp.createTemp('kurashilog-reset-');
-    databasePath = '${directory.path}${Platform.pathSeparator}kurashilog.sqlite';
+    databasePath =
+        '${directory.path}${Platform.pathSeparator}kurashilog.sqlite';
   });
 
   tearDown(() async {
@@ -66,50 +67,51 @@ void main() {
     final recoveredHandle = await AppDatabaseHandle.open(
       databasePath: databasePath,
     );
-    final recoveredRepository = ResettableKurashilogRepository(
-      recoveredHandle,
-    );
+    final recoveredRepository = ResettableKurashilogRepository(recoveredHandle);
     addTearDown(recoveredHandle.close);
 
     expect(await recoveredRepository.countVisits(), 0);
     await _expectResetArtifactsAbsent(databasePath);
   });
 
-  test('a deletion failure never reports success and remains recoverable', () async {
-    var failNextStagedDelete = true;
-    Future<void> deleteFile(File file) async {
-      if (failNextStagedDelete &&
-          file.path.endsWith(AppDatabaseHandle.stagedSuffix) &&
-          await file.exists()) {
-        failNextStagedDelete = false;
-        throw const FileSystemException('injected delete failure');
+  test(
+    'a deletion failure never reports success and remains recoverable',
+    () async {
+      var failNextStagedDelete = true;
+      Future<void> deleteFile(File file) async {
+        if (failNextStagedDelete &&
+            file.path.endsWith(AppDatabaseHandle.stagedSuffix) &&
+            await file.exists()) {
+          failNextStagedDelete = false;
+          throw const FileSystemException('injected delete failure');
+        }
+        if (await file.exists()) await file.delete();
       }
-      if (await file.exists()) await file.delete();
-    }
 
-    final handle = await AppDatabaseHandle.open(
-      databasePath: databasePath,
-      deleteFile: deleteFile,
-    );
-    final repository = ResettableKurashilogRepository(handle);
-    addTearDown(handle.close);
+      final handle = await AppDatabaseHandle.open(
+        databasePath: databasePath,
+        deleteFile: deleteFile,
+      );
+      final repository = ResettableKurashilogRepository(handle);
+      addTearDown(handle.close);
 
-    await repository.insertNewRecords(
-      visits: [_visit('failure')],
-      movements: const [],
-    );
+      await repository.insertNewRecords(
+        visits: [_visit('failure')],
+        movements: const [],
+      );
 
-    await expectLater(
-      repository.deleteAllUserData(),
-      throwsA(isA<DatabaseResetException>()),
-    );
+      await expectLater(
+        repository.deleteAllUserData(),
+        throwsA(isA<DatabaseResetException>()),
+      );
 
-    expect(await repository.countVisits(), 0);
-    await _expectResetArtifactsAbsent(databasePath);
+      expect(await repository.countVisits(), 0);
+      await _expectResetArtifactsAbsent(databasePath);
 
-    await repository.deleteAllUserData();
-    expect(await repository.countVisits(), 0);
-  });
+      await repository.deleteAllUserData();
+      expect(await repository.countVisits(), 0);
+    },
+  );
 
   test('reset drains prior work and blocks later work until reopen', () async {
     final handle = await AppDatabaseHandle.open(databasePath: databasePath);
