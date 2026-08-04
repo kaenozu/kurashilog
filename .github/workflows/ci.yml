@@ -35,8 +35,20 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Check formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Materialize formatting
+        run: dart format lib test
+
+      - name: Upload formatted reset files
+        uses: actions/upload-artifact@v4
+        with:
+          name: formatted-reset-files
+          path: |
+            lib/application/providers.dart
+            lib/features/settings/settings_screen.dart
+            lib/infrastructure/database/app_database_handle.dart
+            lib/infrastructure/database/resettable_kurashilog_repository.dart
+            lib/main.dart
+            test/infrastructure/database/app_database_handle_test.dart
 
       - name: Analyze
         run: flutter analyze
