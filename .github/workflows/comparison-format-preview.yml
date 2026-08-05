@@ -1,7 +1,9 @@
-name: Comparison format preview
+name: Comparison format apply
 
 on:
-  pull_request:
+  push:
+    branches:
+      - agent/18-comparison-domain
     paths:
       - 'lib/domain/models/comparison.dart'
       - 'lib/domain/services/comparison_service.dart'
@@ -9,33 +11,44 @@ on:
       - '.github/workflows/comparison-format-preview.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  preview:
+  format:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
-          persist-credentials: false
+          ref: agent/18-comparison-domain
+          fetch-depth: 0
+          persist-credentials: true
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
-      - name: Emit canonical Dart formatter output
+      - name: Apply formatter to the comparison slice only
         shell: bash
         run: |
           set -euo pipefail
-          files=(
-            lib/domain/models/comparison.dart
-            lib/domain/services/comparison_service.dart
+          dart format \
+            lib/domain/models/comparison.dart \
+            lib/domain/services/comparison_service.dart \
             test/domain/comparison_service_test.dart
-          )
-          dart format "${files[@]}"
-          for file in "${files[@]}"; do
-            echo "::group::BEGIN_FORMATTED:${file}"
-            cat "$file"
-            echo "END_FORMATTED:${file}"
-            echo "::endgroup::"
-          done
+          git diff --check
+          if git diff --quiet -- \
+            lib/domain/models/comparison.dart \
+            lib/domain/services/comparison_service.dart \
+            test/domain/comparison_service_test.dart; then
+            echo 'No formatting changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            lib/domain/models/comparison.dart \
+            lib/domain/services/comparison_service.dart \
+            test/domain/comparison_service_test.dart
+          git commit -m 'style: format comparison domain'
+          git push origin HEAD:agent/18-comparison-domain
