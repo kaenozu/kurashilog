@@ -89,8 +89,7 @@ class OnboardingSetupPanel extends StatelessWidget {
   }
 
   String get _settingsBody => switch (status) {
-    OnboardingSetupStatus.ready =>
-      '設定を開いたあと、このアプリへ戻ると次の操作を案内します。',
+    OnboardingSetupStatus.ready => '設定を開いたあと、このアプリへ戻ると次の操作を案内します。',
     OnboardingSetupStatus.openingSettings => 'Androidの設定画面を開いています。',
     OnboardingSetupStatus.waitingForReturn => '設定を確認したら、このアプリへ戻ってください。',
     OnboardingSetupStatus.returnedFromSettings =>
@@ -176,8 +175,7 @@ class _AnonymousSample extends StatelessWidget {
     final theme = Theme.of(context);
     return Semantics(
       container: true,
-      label:
-          '匿名サンプル。今月は外出した日が12日。よく行った場所は公園。前の期間より休日の行動範囲が広がりました。',
+      label: '匿名サンプル。今月は外出した日が12日。よく行った場所は公園。前の期間より休日の行動範囲が広がりました。',
       child: ExcludeSemantics(
         child: Card(
           color: theme.colorScheme.secondaryContainer,
@@ -237,7 +235,9 @@ class _SampleFact extends StatelessWidget {
         children: <Widget>[
           Icon(icon, size: 20, color: color),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: color))),
+          Expanded(
+            child: Text(text, style: TextStyle(color: color)),
+          ),
         ],
       ),
     );

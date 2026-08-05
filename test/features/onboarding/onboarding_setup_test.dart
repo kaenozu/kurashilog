@@ -58,26 +58,27 @@ void main() {
     expect(find.textContaining('内部画面'), findsOneWidget);
   });
 
-  testWidgets('platform failure is redacted and file selection remains available', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          platformProvider.overrideWithValue(_FailingPlatform()),
-        ],
-        child: const MaterialApp(home: OnboardingScreen()),
-      ),
-    );
+  testWidgets(
+    'platform failure is redacted and file selection remains available',
+    (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            platformProvider.overrideWithValue(_FailingPlatform()),
+          ],
+          child: const MaterialApp(home: OnboardingScreen()),
+        ),
+      );
 
-    await _goToSetup(tester);
-    await tester.tap(find.text('位置情報設定を開く'));
-    await tester.pump();
+      await _goToSetup(tester);
+      await tester.tap(find.text('位置情報設定を開く'));
+      await tester.pump();
 
-    expect(find.textContaining('設定画面を開けませんでした'), findsOneWidget);
-    expect(find.textContaining('secret-content-uri'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, 'ファイルを選ぶ'), findsOneWidget);
-  });
+      expect(find.textContaining('設定画面を開けませんでした'), findsOneWidget);
+      expect(find.textContaining('secret-content-uri'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, 'ファイルを選ぶ'), findsOneWidget);
+    },
+  );
 
   testWidgets('anonymous sample and controls survive 200 percent text', (
     tester,
@@ -109,12 +110,7 @@ void main() {
 
     expect(find.textContaining('匿名の完成例'), findsOneWidget);
     expect(find.text('よく行った場所は公園'), findsOneWidget);
-    expect(
-      find.bySemanticsLabel(
-        RegExp('匿名サンプル.*よく行った場所は公園'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.bySemanticsLabel(RegExp('匿名サンプル.*よく行った場所は公園')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
@@ -133,15 +129,13 @@ class _FakePlatform extends AppPlatform {
   final LocationSettingsDestination destination;
 
   @override
-  Future<LocationSettingsDestination> openLocationSettings() async => destination;
+  Future<LocationSettingsDestination> openLocationSettings() async =>
+      destination;
 }
 
 class _FailingPlatform extends AppPlatform {
   @override
   Future<LocationSettingsDestination> openLocationSettings() {
-    throw PlatformException(
-      code: 'INTERNAL',
-      message: 'secret-content-uri',
-    );
+    throw PlatformException(code: 'INTERNAL', message: 'secret-content-uri');
   }
 }

@@ -28,14 +28,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
     _OnboardingPageData(
       icon: Icons.security,
       title: '端末内だけで処理されます',
-      body:
-          '取り込んだ位置履歴は、この端末の中だけで分析されます。アプリはインターネットへ接続せず、データを外部へ送信しません。',
+      body: '取り込んだ位置履歴は、この端末の中だけで分析されます。アプリはインターネットへ接続せず、データを外部へ送信しません。',
     ),
     _OnboardingPageData(
       icon: Icons.auto_stories_outlined,
       title: '生活の変化を振り返れます',
-      body:
-          '外出した日、よく行った場所、前の期間との違いを、根拠とデータ品質を添えて表示します。記録が足りない場合は無理に断定しません。',
+      body: '外出した日、よく行った場所、前の期間との違いを、根拠とデータ品質を添えて表示します。記録が足りない場合は無理に断定しません。',
     ),
   ];
 
@@ -166,9 +164,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen>
                           curve: Curves.easeOut,
                         )
                       : _completeOnboarding,
-                  child: Text(
-                    _page < _pageCount - 1 ? '次へ' : 'ホームへ進む',
-                  ),
+                  child: Text(_page < _pageCount - 1 ? '次へ' : 'ホームへ進む'),
                 ),
               ),
             ),
