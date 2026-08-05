@@ -23,8 +23,7 @@ abstract final class KurashilogSize {
 }
 
 @immutable
-class KurashilogJournalColors
-    extends ThemeExtension<KurashilogJournalColors> {
+class KurashilogJournalColors extends ThemeExtension<KurashilogJournalColors> {
   const KurashilogJournalColors({
     required this.paper,
     required this.paperElevated,
@@ -223,22 +222,21 @@ class JournalCard extends StatelessWidget {
               Text(
                 title,
                 style: switch (kind) {
-                  JournalCardKind.hero => Theme.of(context)
-                      .textTheme
-                      .headlineMedium
-                      ?.copyWith(fontWeight: FontWeight.w700, height: 1.15),
-                  JournalCardKind.insight => Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                  JournalCardKind.map => Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontWeight: FontWeight.w700),
-                  JournalCardKind.mini => Theme.of(context)
-                      .textTheme
-                      .titleSmall
-                      ?.copyWith(fontWeight: FontWeight.w700),
+                  JournalCardKind.hero =>
+                    Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
+                    ),
+                  JournalCardKind.insight => Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                  JournalCardKind.map =>
+                    Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  JournalCardKind.mini => Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 },
               ),
               if (subtitle != null) ...<Widget>[
@@ -339,9 +337,7 @@ class JournalStatePanel extends StatelessWidget {
                         children: <Widget>[
                           Text(
                             title,
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   color: foreground,
                                   fontWeight: FontWeight.w700,

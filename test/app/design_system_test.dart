@@ -19,18 +19,15 @@ void main() {
   });
 
   test('spacing and tap target contracts remain stable', () {
-    expect(
-      <double>[
-        KurashilogSpacing.xxs,
-        KurashilogSpacing.xs,
-        KurashilogSpacing.sm,
-        KurashilogSpacing.md,
-        KurashilogSpacing.lg,
-        KurashilogSpacing.xl,
-        KurashilogSpacing.xxl,
-      ],
-      orderedEquals(<double>[4, 8, 12, 16, 24, 32, 48]),
-    );
+    expect(<double>[
+      KurashilogSpacing.xxs,
+      KurashilogSpacing.xs,
+      KurashilogSpacing.sm,
+      KurashilogSpacing.md,
+      KurashilogSpacing.lg,
+      KurashilogSpacing.xl,
+      KurashilogSpacing.xxl,
+    ], orderedEquals(<double>[4, 8, 12, 16, 24, 32, 48]));
     expect(KurashilogSize.minimumTapTarget, 48);
     expect(KurashilogRadius.large, greaterThan(KurashilogRadius.medium));
   });
@@ -92,10 +89,7 @@ void main() {
     await tester.pumpAndSettle();
 
     for (final tone in JournalStateTone.values) {
-      expect(
-        find.bySemanticsLabel('${tone.name}。状態の説明'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsLabel('${tone.name}。状態の説明'), findsOneWidget);
     }
   });
 
