@@ -33,6 +33,10 @@ abstract interface class KurashilogRepository {
   Future<StoredCluster?> clusterById(int id);
   Future<void> updateClusterLabel(int clusterId, int? labelId);
   Future<void> setClusterExcluded(int clusterId, bool excluded);
+  Future<void> setClusterPrivacyMode(
+    int clusterId,
+    PlacePrivacyMode privacyMode,
+  );
   Future<int> insertLabel(StoredLabel label);
   Future<void> updateLabel(StoredLabel label);
   Future<List<StoredLabel>> allLabels();
