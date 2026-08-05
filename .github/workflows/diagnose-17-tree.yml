@@ -1,0 +1,23 @@
+name: Diagnose insight integration surface
+
+on:
+  pull_request:
+    branches:
+      - agent/18-comparison-domain
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Print relevant source tree
+        run: |
+          echo '=== FILES ==='
+          find lib test -maxdepth 5 -type f | sort
+          echo '=== DOMAIN TYPES ==='
+          grep -R -n -E 'class (Visit|Movement|Cluster|Summary|Insight)|enum .*Category|abstract class .*Repository' lib test || true
+          echo '=== HOME / PROVIDER / DATABASE ==='
+          grep -R -n -E 'class .*Page|class .*Provider|class .*Repository|class .*Database|Widget build' lib | head -n 400 || true
