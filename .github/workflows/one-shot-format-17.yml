@@ -1,0 +1,44 @@
+name: One-shot validate first report insights
+
+on:
+  pull_request:
+    branches:
+      - agent/18-comparison-domain
+    paths:
+      - '.github/workflows/one-shot-format-17.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/17-insight-ranking
+          fetch-depth: 0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+          cache: true
+      - name: Format and validate
+        run: |
+          rm .github/workflows/diagnose-17-tree.yml
+          rm .github/workflows/one-shot-format-17.yml
+          dart format \
+            lib/domain/models/insight.dart \
+            lib/domain/rules/insight_engine.dart \
+            test/domain/insight_engine_first_report_test.dart
+          flutter pub get
+          flutter test test/domain/insight_engine_first_report_test.dart
+          git diff --check
+      - name: Commit validated implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: validate deterministic first report insights'
+          git push origin HEAD:agent/17-insight-ranking
