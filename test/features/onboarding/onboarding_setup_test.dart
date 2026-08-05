@@ -27,8 +27,8 @@ void main() {
     await tester.pump();
     expect(find.text('設定を確認したら、このアプリへ戻ってください。'), findsOneWidget);
 
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
 
     expect(find.textContaining('設定から戻りました'), findsOneWidget);
@@ -97,6 +97,13 @@ void main() {
           ),
         ),
       ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('これは匿名の完成例です。実データや位置情報は含みません。'),
+      320,
+      scrollable: find.byType(Scrollable),
     );
     await tester.pumpAndSettle();
 
