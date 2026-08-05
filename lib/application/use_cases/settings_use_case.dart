@@ -4,7 +4,7 @@ import '../repositories/kurashilog_repository.dart';
 enum WeekStart { sunday, monday }
 
 /// 距離単位。
-enum DistanceUnit { km, m }
+enum DistanceUnit { km, mi }
 
 /// アプリ設定（設計書 FR-120 設定）。
 class AppSettingsData {
@@ -28,7 +28,7 @@ class SettingsUseCase {
     final du = await repository.getSetting(_distanceUnitKey);
     return AppSettingsData(
       weekStart: ws?.value == '0' ? WeekStart.sunday : WeekStart.monday,
-      distanceUnit: du?.value == 'm' ? DistanceUnit.m : DistanceUnit.km,
+      distanceUnit: du?.value == 'mi' ? DistanceUnit.mi : DistanceUnit.km,
     );
   }
 
@@ -39,7 +39,7 @@ class SettingsUseCase {
 
   Future<void> setDistanceUnit(DistanceUnit value) => repository.setSetting(
     _distanceUnitKey,
-    value == DistanceUnit.m ? 'm' : 'km',
+    value == DistanceUnit.mi ? 'mi' : 'km',
   );
 
   Future<bool> isOnboardingDone() async {

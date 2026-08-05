@@ -43,6 +43,7 @@ final dashboardUseCaseProvider = Provider<DashboardUseCase>(
   (ref) => DashboardUseCase(
     repository: ref.watch(repositoryProvider),
     analysis: ref.watch(analysisCoordinatorProvider),
+    settings: ref.watch(settingsUseCaseProvider),
   ),
 );
 
@@ -55,6 +56,10 @@ final placesUseCaseProvider = Provider<PlacesUseCase>(
 
 final settingsUseCaseProvider = Provider<SettingsUseCase>(
   (ref) => SettingsUseCase(repository: ref.watch(repositoryProvider)),
+);
+
+final appSettingsProvider = FutureProvider<AppSettingsData>(
+  (ref) => ref.watch(settingsUseCaseProvider).load(),
 );
 
 final dataManagementUseCaseProvider = Provider<DataManagementUseCase>(

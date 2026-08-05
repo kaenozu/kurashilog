@@ -4,8 +4,10 @@ import '../../domain/models/summaries.dart';
 import '../../domain/services/freshness_service.dart';
 import '../../domain/services/summary_service.dart';
 import '../analysis/analysis_coordinator.dart';
+import '../display_preferences.dart';
 import '../analysis/window.dart';
 import '../repositories/kurashilog_repository.dart';
+import 'settings_use_case.dart';
 
 /// ホーム表示データ（設計書 7.4 DashboardViewModel）。
 class DashboardData {
@@ -98,12 +100,14 @@ class DashboardUseCase {
   const DashboardUseCase({
     required this.repository,
     required this.analysis,
+    required this.settings,
     this.freshness = const FreshnessService(),
     this.summaries = const SummaryService(),
   });
 
   final KurashilogRepository repository;
   final AnalysisCoordinator analysis;
+  final SettingsUseCase settings;
   final FreshnessService freshness;
   final SummaryService summaries;
 
@@ -173,7 +177,12 @@ class DashboardUseCase {
       for (final d in daily) d.localDate: d.outingFlag ? 1 : 0,
     };
 
-    final metrics = _buildHomeMetrics(monthly, previous);
+    final displaySettings = await settings.load();
+    final metrics = _buildHomeMetrics(
+      monthly,
+      previous,
+      displaySettings.distanceUnit,
+    );
 
     return DashboardData(
       hasData: true,
@@ -190,6 +199,7 @@ class DashboardUseCase {
   List<MetricCardData> _buildHomeMetrics(
     MonthlySummaryData? current,
     MonthlySummaryData? previous,
+    DistanceUnit distanceUnit,
   ) {
     if (current == null) return const [];
 
@@ -208,7 +218,7 @@ class DashboardUseCase {
       ),
       MetricCardData(
         label: '推定移動距離',
-        value: _km(current.distanceM),
+        value: formatDistance(current.distanceM, distanceUnit),
         icon: MetricIcon.route,
         deltaLabel: prevDistance > 0
             ? _deltaLabel(
@@ -338,7 +348,4 @@ class DashboardUseCase {
     final sign = delta > 0 ? '+' : '';
     return '$prefix $sign$delta${percent ? '%' : ''}';
   }
-
-  String _km(int meters) =>
-      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }
