@@ -11,11 +11,7 @@ void main() {
       context(
         currentClusterVisits: const <int, int>{1: 12, 2: 8, 3: 0},
         previousClusterVisits: const <int, int>{1: 4, 2: 0, 3: 9},
-        clusterNames: const <int, String>{
-          1: '公園',
-          2: '図書館',
-          3: '商店街',
-        },
+        clusterNames: const <int, String>{1: '公園', 2: '図書館', 3: '商店街'},
         newClusterCount: 4,
       ),
     );
@@ -87,7 +83,10 @@ void main() {
       result.where((item) => item.kind == InsightKind.changedMetric),
       isEmpty,
     );
-    expect(engine.selectForHome(context(quality: DataQuality.historyOnly)), isEmpty);
+    expect(
+      engine.selectForHome(context(quality: DataQuality.historyOnly)),
+      isEmpty,
+    );
   });
 
   test('missing labels use a neutral name without exposing identifiers', () {

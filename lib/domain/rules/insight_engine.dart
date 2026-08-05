@@ -32,11 +32,7 @@ class InsightEngine {
       ...newPlaces,
       ...changes.skip(1),
     ];
-    return _takeDistinct(
-      ordered,
-      firstReportMaxInsights,
-      uniqueKinds: true,
-    );
+    return _takeDistinct(ordered, firstReportMaxInsights, uniqueKinds: true);
   }
 
   List<InsightData> selectForMonthStory(InsightContext context) =>
@@ -117,13 +113,17 @@ class InsightEngine {
   }
 
   List<InsightData> _topPlace(InsightContext context) {
-    final candidates = context.currentClusterVisits.entries
-        .where((entry) => entry.value >= 2 && _isVisibleCluster(context, entry.key))
-        .toList(growable: false)
-      ..sort((a, b) {
-        final visits = b.value.compareTo(a.value);
-        return visits != 0 ? visits : a.key.compareTo(b.key);
-      });
+    final candidates =
+        context.currentClusterVisits.entries
+            .where(
+              (entry) =>
+                  entry.value >= 2 && _isVisibleCluster(context, entry.key),
+            )
+            .toList(growable: false)
+          ..sort((a, b) {
+            final visits = b.value.compareTo(a.value);
+            return visits != 0 ? visits : a.key.compareTo(b.key);
+          });
     if (candidates.isEmpty) return const <InsightData>[];
     final best = candidates.first;
     final label = _clusterLabel(context, best.key);
@@ -148,21 +148,22 @@ class InsightEngine {
   }
 
   List<InsightData> _lapsedPlace(InsightContext context) {
-    final candidates = context.previousClusterVisits.entries
-        .where((entry) {
-          if (entry.value < 3 || !_isVisibleCluster(context, entry.key)) {
-            return false;
-          }
-          final current = context.currentClusterVisits[entry.key] ?? 0;
-          return current * 3 <= entry.value;
-        })
-        .toList(growable: false)
-      ..sort((a, b) {
-        final aCurrent = context.currentClusterVisits[a.key] ?? 0;
-        final bCurrent = context.currentClusterVisits[b.key] ?? 0;
-        final delta = (b.value - bCurrent).compareTo(a.value - aCurrent);
-        return delta != 0 ? delta : a.key.compareTo(b.key);
-      });
+    final candidates =
+        context.previousClusterVisits.entries
+            .where((entry) {
+              if (entry.value < 3 || !_isVisibleCluster(context, entry.key)) {
+                return false;
+              }
+              final current = context.currentClusterVisits[entry.key] ?? 0;
+              return current * 3 <= entry.value;
+            })
+            .toList(growable: false)
+          ..sort((a, b) {
+            final aCurrent = context.currentClusterVisits[a.key] ?? 0;
+            final bCurrent = context.currentClusterVisits[b.key] ?? 0;
+            final delta = (b.value - bCurrent).compareTo(a.value - aCurrent);
+            return delta != 0 ? delta : a.key.compareTo(b.key);
+          });
     if (candidates.isEmpty) return const <InsightData>[];
     final best = candidates.first;
     final current = context.currentClusterVisits[best.key] ?? 0;
