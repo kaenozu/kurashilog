@@ -1,0 +1,62 @@
+name: Private acceptance harness validation
+
+on:
+  pull_request:
+    paths:
+      - 'tool/acceptance/**'
+      - 'tools/local_acceptance/**'
+      - 'docs/private-timeline-acceptance.md'
+      - '.github/workflows/private-acceptance-scripts.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'tool/acceptance/**'
+      - 'tools/local_acceptance/**'
+      - 'docs/private-timeline-acceptance.md'
+      - '.github/workflows/private-acceptance-scripts.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Format and analyze acceptance harness
+        run: |
+          dart format --output=none --set-exit-if-changed tool/acceptance/private_timeline_acceptance_test.dart
+          flutter analyze
+      - name: Prove harness is inert without private input
+        run: flutter test tool/acceptance/private_timeline_acceptance_test.dart
+
+  parse-powershell:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Parse PowerShell runner
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ./tools/local_acceptance/Invoke-KurashilogPrivateTimelineAcceptance.ps1),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
