@@ -1,21 +1,6 @@
 import '../../application/models/persistence_models.dart';
 import '../models/lat_lng.dart';
 
-enum PlacePrivacyMode {
-  visible,
-  hideName,
-  blurMap,
-  exclude;
-
-  static PlacePrivacyMode parse(String value, {bool legacyExcluded = false}) {
-    if (legacyExcluded) return PlacePrivacyMode.exclude;
-    return PlacePrivacyMode.values.firstWhere(
-      (mode) => mode.name == value,
-      orElse: () => PlacePrivacyMode.visible,
-    );
-  }
-}
-
 class PlaceProjection {
   const PlaceProjection({
     required this.sourceClusterId,
