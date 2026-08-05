@@ -120,17 +120,17 @@ class _SetupStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Semantics(
-      container: true,
-      label: '手順$number、$title。$body',
-      child: ExcludeSemantics(
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Row(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Semantics(
+              container: true,
+              label: '手順$number、$title。$body',
+              child: ExcludeSemantics(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     CircleAvatar(
@@ -155,13 +155,13 @@ class _SetupStep extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (action != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  action!,
-                ],
-              ],
+              ),
             ),
-          ),
+            if (action != null) ...<Widget>[
+              const SizedBox(height: 12),
+              action!,
+            ],
+          ],
         ),
       ),
     );
@@ -193,8 +193,14 @@ class _AnonymousSample extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                const _SampleFact(icon: Icons.calendar_today, text: '今月は外出した日が12日'),
-                const _SampleFact(icon: Icons.place_outlined, text: 'よく行った場所は公園'),
+                const _SampleFact(
+                  icon: Icons.calendar_today,
+                  text: '今月は外出した日が12日',
+                ),
+                const _SampleFact(
+                  icon: Icons.place_outlined,
+                  text: 'よく行った場所は公園',
+                ),
                 const _SampleFact(
                   icon: Icons.trending_up,
                   text: '前の期間より休日の行動範囲が広がりました',
