@@ -12,7 +12,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final settings = ref.watch(_settingsProvider);
+    final settings = ref.watch(appSettingsProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('設定・データ管理')),
@@ -44,7 +44,8 @@ class SettingsScreen extends ConsumerWidget {
                         await ref
                             .read(settingsUseCaseProvider)
                             .setWeekStart(v.first);
-                        ref.invalidate(_settingsProvider);
+                        ref.invalidate(appSettingsProvider);
+                        ref.read(dashboardRefreshProvider.notifier).state++;
                       },
                     ),
                   ),
@@ -58,14 +59,18 @@ class SettingsScreen extends ConsumerWidget {
                           value: DistanceUnit.km,
                           label: Text('km'),
                         ),
-                        ButtonSegment(value: DistanceUnit.m, label: Text('m')),
+                        ButtonSegment(
+                          value: DistanceUnit.mi,
+                          label: Text('mi'),
+                        ),
                       ],
                       selected: {s.distanceUnit},
                       onSelectionChanged: (v) async {
                         await ref
                             .read(settingsUseCaseProvider)
                             .setDistanceUnit(v.first);
-                        ref.invalidate(_settingsProvider);
+                        ref.invalidate(appSettingsProvider);
+                        ref.read(dashboardRefreshProvider.notifier).state++;
                       },
                     ),
                   ),
@@ -178,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
     }
 
     ref.read(dashboardRefreshProvider.notifier).state++;
-    ref.invalidate(_settingsProvider);
+    ref.invalidate(appSettingsProvider);
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
@@ -186,10 +191,6 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 }
-
-final _settingsProvider = FutureProvider.autoDispose<AppSettingsData>(
-  (ref) => ref.watch(settingsUseCaseProvider).load(),
-);
 
 class _OnboardingRedirect extends ConsumerWidget {
   const _OnboardingRedirect();

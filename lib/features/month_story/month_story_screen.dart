@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/display_preferences.dart';
 import '../../application/providers.dart';
+import '../../application/use_cases/settings_use_case.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
 import '../../domain/models/insight.dart';
 import '../../shared/widgets.dart';
@@ -28,6 +30,9 @@ class _MonthStoryScreenState extends ConsumerState<MonthStoryScreen> {
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(_monthStoryProvider(_month));
+    final distanceUnit =
+        ref.watch(appSettingsProvider).valueOrNull?.distanceUnit ??
+        DistanceUnit.km;
 
     return Scaffold(
       appBar: AppBar(
@@ -48,7 +53,7 @@ class _MonthStoryScreenState extends ConsumerState<MonthStoryScreen> {
       body: data.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('読み込みに失敗しました: $e')),
-        data: (d) => _StoryBody(data: d),
+        data: (d) => _StoryBody(data: d, distanceUnit: distanceUnit),
       ),
     );
   }
@@ -73,9 +78,10 @@ final _monthStoryProvider = FutureProvider.autoDispose
     });
 
 class _StoryBody extends StatelessWidget {
-  const _StoryBody({required this.data});
+  const _StoryBody({required this.data, required this.distanceUnit});
 
   final MonthStoryData data;
+  final DistanceUnit distanceUnit;
 
   @override
   Widget build(BuildContext context) {
@@ -121,7 +127,7 @@ class _StoryBody extends StatelessWidget {
             _pill(
               theme,
               '移動距離',
-              _km(monthly.distanceM),
+              formatDistance(monthly.distanceM, distanceUnit),
               _deltaPercent(prev?.distanceM, monthly.distanceM),
             ),
             _pill(
@@ -258,9 +264,6 @@ class _StoryBody extends StatelessWidget {
     if (r == 0) return '前月と同程度';
     return '前月比 ${r > 0 ? '+' : ''}$r%';
   }
-
-  String _km(int meters) =>
-      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 
   String _formatMonth(String ym) {
     final parts = ym.split('-');

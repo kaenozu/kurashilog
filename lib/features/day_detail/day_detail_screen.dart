@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../application/display_preferences.dart';
 import '../../application/providers.dart';
+import '../../application/use_cases/settings_use_case.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../shared/widgets.dart';
@@ -16,6 +18,9 @@ class DayDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final data = ref.watch(_dayDetailProvider(localDate));
+    final distanceUnit =
+        ref.watch(appSettingsProvider).valueOrNull?.distanceUnit ??
+        DistanceUnit.km;
 
     return Scaffold(
       appBar: AppBar(title: Text(_formatDate(localDate))),
@@ -30,7 +35,7 @@ class DayDetailScreen extends ConsumerWidget {
               message: 'この日の記録は見つかりませんでした。',
             );
           }
-          return _TimelineBody(data: d);
+          return _TimelineBody(data: d, distanceUnit: distanceUnit);
         },
       ),
     );
@@ -43,9 +48,10 @@ final _dayDetailProvider = FutureProvider.autoDispose
     );
 
 class _TimelineBody extends StatelessWidget {
-  const _TimelineBody({required this.data});
+  const _TimelineBody({required this.data, required this.distanceUnit});
 
   final DayDetailData data;
+  final DistanceUnit distanceUnit;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +66,7 @@ class _TimelineBody extends StatelessWidget {
             Icon(Icons.directions_walk, color: theme.colorScheme.primary),
             const SizedBox(width: 8),
             Text(
-              '移動距離 合計 ${_km(data.totalDistanceM)}',
+              '移動距離 合計 ${formatDistance(data.totalDistanceM, distanceUnit)}',
               style: theme.textTheme.titleSmall,
             ),
             const Spacer(),
@@ -78,14 +84,12 @@ class _TimelineBody extends StatelessWidget {
             entry: data.entries[i],
             timeFmt: timeFmt,
             isLast: i == data.entries.length - 1,
+            distanceUnit: distanceUnit,
           ),
         const SizedBox(height: 24),
       ],
     );
   }
-
-  String _km(int meters) =>
-      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 }
 
 class _TimelineRow extends ConsumerWidget {
@@ -93,11 +97,13 @@ class _TimelineRow extends ConsumerWidget {
     required this.entry,
     required this.timeFmt,
     required this.isLast,
+    required this.distanceUnit,
   });
 
   final DayTimelineEntry entry;
   final DateFormat timeFmt;
   final bool isLast;
+  final DistanceUnit distanceUnit;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -111,7 +117,8 @@ class _TimelineRow extends ConsumerWidget {
     final subtitle = isVisit
         ? (entry.dwellMinutes != null ? '滞在 ${entry.dwellMinutes!} 分' : '訪問')
         : [
-            if (entry.distanceM != null) _km(entry.distanceM!),
+            if (entry.distanceM != null)
+              formatDistance(entry.distanceM!, distanceUnit),
             if (entry.activityType != null) _activityLabel(entry.activityType!),
             if (entry.distanceLabel != null) entry.distanceLabel!,
           ].join(' ・ ');
@@ -188,9 +195,6 @@ class _TimelineRow extends ConsumerWidget {
       ),
     );
   }
-
-  String _km(int meters) =>
-      meters >= 1000 ? '${(meters / 1000).toStringAsFixed(1)}km' : '${meters}m';
 
   String _activityLabel(String type) => switch (type) {
     'IN_PASSENGER_VEHICLE' => '車',

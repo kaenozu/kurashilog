@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../application/display_preferences.dart';
 import '../../application/providers.dart';
+import '../../application/use_cases/settings_use_case.dart';
 import '../../shared/widgets.dart';
 import '../day_detail/day_detail_screen.dart';
 import '../month_story/month_story_screen.dart';
@@ -15,6 +17,9 @@ class CalendarScreen extends ConsumerWidget {
     final month = ref.watch(selectedMonthProvider);
     final daily = ref.watch(_monthlyDaysProvider(month));
     final hasData = ref.watch(repositoryHasDataProvider);
+    final weekStart =
+        ref.watch(appSettingsProvider).valueOrNull?.weekStart ??
+        WeekStart.monday;
 
     return Scaffold(
       appBar: AppBar(
@@ -43,7 +48,7 @@ class CalendarScreen extends ConsumerWidget {
               message: 'タイムライン JSON を取り込むと、外出の記録が表示されます。',
             );
           }
-          return _CalendarBody(month: month, days: days);
+          return _CalendarBody(month: month, days: days, weekStart: weekStart);
         },
       ),
     );
@@ -82,12 +87,15 @@ final repositoryHasDataProvider = FutureProvider.autoDispose<bool>((ref) async {
 });
 
 class _CalendarBody extends ConsumerWidget {
-  const _CalendarBody({required this.month, required this.days});
+  const _CalendarBody({
+    required this.month,
+    required this.days,
+    required this.weekStart,
+  });
 
   final String month;
   final Map<String, bool> days;
-
-  static const _weekLabels = ['月', '火', '水', '木', '金', '土', '日'];
+  final WeekStart weekStart;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -95,13 +103,13 @@ class _CalendarBody extends ConsumerWidget {
     final parts = month.split('-');
     final y = int.parse(parts[0]);
     final m = int.parse(parts[1]);
-    final firstWeekday = DateTime(y, m, 1).weekday;
+    final firstDay = DateTime(y, m, 1);
     final daysInMonth = DateTime(y, m + 1, 0).day;
     final today = DateTime.now();
-    final leadingBlanks = firstWeekday - 1;
+    final leadingBlanks = calendarLeadingBlanks(firstDay, weekStart);
 
     final cells = <Widget>[];
-    for (final label in _weekLabels) {
+    for (final label in weekLabels(weekStart)) {
       cells.add(Center(child: Text(label, style: theme.textTheme.labelSmall)));
     }
     for (var i = 0; i < leadingBlanks; i++) {
