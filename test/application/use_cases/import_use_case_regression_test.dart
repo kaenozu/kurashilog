@@ -124,12 +124,13 @@ class _StubValidator extends RecordValidator {
   const _StubValidator();
 
   @override
-  Future<ValidationResult> validate(
+  Stream<ValidationBatch> validateBatches(
     Stream<NormalizedRecord> records,
-    CancellationToken token,
-  ) async {
+    CancellationToken token, {
+    int batchSize = 500,
+  }) async* {
     final start = DateTime.utc(2026, 8, 4, 8);
-    return ValidationResult(
+    yield ValidationBatch(
       visits: [
         StoredVisit(
           id: 0,
@@ -142,6 +143,8 @@ class _StubValidator extends RecordValidator {
       ],
       movements: const [],
       warnings: const [ImportWarning('VAL-001', '本取込の警告')],
+      processedRecords: 1,
+      isFinal: true,
     );
   }
 }

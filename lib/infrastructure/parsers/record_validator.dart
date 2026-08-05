@@ -4,7 +4,7 @@ import '../../domain/services/distance_service.dart';
 import '../../application/models/persistence_models.dart';
 import 'timeline_parser.dart';
 
-/// 検証結果。
+/// Complete validation result for small inputs and compatibility callers.
 class ValidationResult {
   const ValidationResult({
     required this.visits,
@@ -19,14 +19,27 @@ class ValidationResult {
   int get totalRecords => visits.length + movements.length;
 }
 
-/// レコード検証（設計書 5.4 検証規則）。
-///
-/// - 座標が範囲外 → レコードを破棄し warning。
-/// - 開始 > 終了 → 補正せず破棄。
-/// - 開始 = 終了 → 訪問は破棄、移動は距離 0 なら破棄。
-/// - 速度が非現実的 → レコードは保持可能だが距離集計から除外し品質低下。
-/// - 必須トップレベルキーなし → ファイル全体を unsupported で終了（検出側）。
-/// - 未知フィールド → 無視し、パーサーバージョンと警告件数を記録。
+/// A bounded validation batch. Warnings are cumulative so the final batch is
+/// the authoritative warning snapshot even when it contains no records.
+class ValidationBatch {
+  const ValidationBatch({
+    required this.visits,
+    required this.movements,
+    required this.warnings,
+    required this.processedRecords,
+    required this.isFinal,
+  });
+
+  final List<StoredVisit> visits;
+  final List<StoredMovement> movements;
+  final List<ImportWarning> warnings;
+  final int processedRecords;
+  final bool isFinal;
+
+  int get totalRecords => visits.length + movements.length;
+}
+
+/// Record validation with a bounded-memory streaming API.
 class RecordValidator {
   const RecordValidator({this.distanceService = const DistanceService()});
 
@@ -38,32 +51,68 @@ class RecordValidator {
   ) async {
     final visits = <StoredVisit>[];
     final movements = <StoredMovement>[];
+    var warnings = const <ImportWarning>[];
+    await for (final batch in validateBatches(records, token)) {
+      visits.addAll(batch.visits);
+      movements.addAll(batch.movements);
+      warnings = batch.warnings;
+    }
+    return ValidationResult(
+      visits: visits,
+      movements: movements,
+      warnings: warnings,
+    );
+  }
+
+  Stream<ValidationBatch> validateBatches(
+    Stream<NormalizedRecord> records,
+    CancellationToken token, {
+    int batchSize = 500,
+  }) async* {
+    if (batchSize < 1) {
+      throw ArgumentError.value(batchSize, 'batchSize', 'must be positive');
+    }
+
+    final visits = <StoredVisit>[];
+    final movements = <StoredMovement>[];
     final warningMap = <String, ImportWarning>{};
+    var processedRecords = 0;
 
     void warn(String code, String message) {
       warningMap[code] = (warningMap[code] ?? ImportWarning(code, message))
           .mergedWith(ImportWarning(code, message));
     }
 
+    ValidationBatch snapshot({required bool isFinal}) => ValidationBatch(
+      visits: List.unmodifiable(visits),
+      movements: List.unmodifiable(movements),
+      warnings: List.unmodifiable(warningMap.values),
+      processedRecords: processedRecords,
+      isFinal: isFinal,
+    );
+
     await for (final record in records) {
       if (token.isCancelled) {
         throw const ImportParseException('IMP-005', 'キャンセルされました');
       }
+      processedRecords++;
       switch (record) {
         case NormalizedVisit():
-          final v = _validateVisit(record, warn);
-          if (v != null) visits.add(v);
+          final visit = _validateVisit(record, warn);
+          if (visit != null) visits.add(visit);
         case NormalizedMovement():
-          final m = _validateMovement(record, warn);
-          if (m != null) movements.add(m);
+          final movement = _validateMovement(record, warn);
+          if (movement != null) movements.add(movement);
+      }
+
+      if (visits.length + movements.length >= batchSize) {
+        yield snapshot(isFinal: false);
+        visits.clear();
+        movements.clear();
       }
     }
 
-    return ValidationResult(
-      visits: visits,
-      movements: movements,
-      warnings: warningMap.values.toList(),
-    );
+    yield snapshot(isFinal: true);
   }
 
   StoredVisit? _validateVisit(
@@ -109,7 +158,6 @@ class RecordValidator {
       return null;
     }
 
-    // 異常速度: レコードは保持し、日常移動集計から除外（設計書 6.2）。
     var validDistance =
         movement.distanceMethod != DistanceMethod.unknown &&
         movement.distanceM != null;
