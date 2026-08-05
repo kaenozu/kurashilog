@@ -207,41 +207,50 @@ class ImportUseCase {
 
     try {
       onProgress?.call(const ImportProgress(ImportStage.parsing, percent: 10));
-      final records = parser.parse(file.openRead(), cancellation);
-      final validated = await validator.validate(records, cancellation);
-      warnings = mergeImportWarnings(previewWarnings, validated.warnings);
-      onProgress?.call(
-        const ImportProgress(ImportStage.validating, percent: 40),
-      );
-
-      if (cancellation.isCancelled) {
-        await _recordTerminalState(
-          importId: importId,
-          fileHash: fileHash,
-          startedAt: startedAt,
-          status: 'cancelled',
-          warningCount: importWarningCount(warnings),
-        );
-        return ImportResult(
-          ok: false,
-          warnings: warnings,
-          errorCode: 'IMP-005',
-          errorMessage: 'キャンセルされました',
-        );
-      }
-
-      final sourceMinAt = _minStart(validated.visits, validated.movements);
-      final sourceMaxAt = _maxEnd(validated.visits, validated.movements);
-      late ImportDiffResult diff;
+      DateTime? sourceMinAt;
+      DateTime? sourceMaxAt;
+      var addedVisits = 0;
+      var addedMovements = 0;
 
       await repository.runInTransaction(() async {
-        onProgress?.call(
-          const ImportProgress(ImportStage.parsing, percent: 60),
-        );
-        diff = await repository.insertNewRecords(
-          visits: validated.visits,
-          movements: validated.movements,
-        );
+        final records = parser.parse(file.openRead(), cancellation);
+        await for (final batch in validator.validateBatches(
+          records,
+          cancellation,
+          batchSize: 500,
+        )) {
+          warnings = mergeImportWarnings(previewWarnings, batch.warnings);
+          if (cancellation.isCancelled) {
+            throw const ImportParseException('IMP-005', 'キャンセルされました');
+          }
+
+          if (batch.totalRecords > 0) {
+            final diff = await repository.insertNewRecords(
+              visits: batch.visits,
+              movements: batch.movements,
+            );
+            addedVisits += diff.addedVisits;
+            addedMovements += diff.addedMovements;
+
+            final batchMin = _minStart(batch.visits, batch.movements);
+            if (batchMin != null &&
+                (sourceMinAt == null || batchMin.isBefore(sourceMinAt!))) {
+              sourceMinAt = batchMin;
+            }
+            final batchMax = _maxEnd(batch.visits, batch.movements);
+            if (batchMax != null &&
+                (sourceMaxAt == null || batchMax.isAfter(sourceMaxAt!))) {
+              sourceMaxAt = batchMax;
+            }
+          }
+
+          final validationPercent = (40 + batch.processedRecords ~/ 500)
+              .clamp(40, 60)
+              .toInt();
+          onProgress?.call(
+            ImportProgress(ImportStage.validating, percent: validationPercent),
+          );
+        }
 
         if (cancellation.isCancelled) {
           throw const ImportParseException('IMP-005', 'キャンセルされました');
@@ -252,8 +261,6 @@ class ImportUseCase {
         );
         await analysis.rebuildAll();
 
-        // Analysis may run in an isolate. A cancellation requested while that
-        // work is running must still roll back this entire import transaction.
         if (cancellation.isCancelled) {
           throw const ImportParseException('IMP-005', 'キャンセルされました');
         }
@@ -272,8 +279,8 @@ class ImportUseCase {
             sourceMaxAt: sourceMaxAt,
             status: 'completed',
             warningCount: importWarningCount(warnings),
-            addedVisits: diff.addedVisits,
-            addedMovements: diff.addedMovements,
+            addedVisits: addedVisits,
+            addedMovements: addedMovements,
           ),
         );
       });
@@ -283,8 +290,8 @@ class ImportUseCase {
       );
       return ImportResult(
         ok: true,
-        addedVisits: diff.addedVisits,
-        addedMovements: diff.addedMovements,
+        addedVisits: addedVisits,
+        addedMovements: addedMovements,
         sourceMinAt: sourceMinAt,
         sourceMaxAt: sourceMaxAt,
         warnings: warnings,
