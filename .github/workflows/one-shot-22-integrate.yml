@@ -1,0 +1,122 @@
+name: One-shot integrate incremental import
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/one-shot-22-integrate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/22-incremental-import
+          fetch-depth: 0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+          cache: true
+      - name: Integrate provenance shortcuts
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if text.count(old) < count:
+                  raise SystemExit(f'{path}: pattern not found: {old[:100]}')
+              file.write_text(text.replace(old, new, count), encoding='utf-8')
+
+          replace(
+              'lib/application/repositories/kurashilog_repository.dart',
+              '  Future<ImportedFileRecord?> latestCompletedImport();\n',
+              '  Future<ImportedFileRecord?> latestCompletedImport();\n'
+              '  Future<ImportedFileRecord?> completedImportByHash(String fileHash);\n',
+          )
+
+          replace(
+              'lib/infrastructure/database/kurashilog_repository_impl.dart',
+              "  @override\n  Future<int> insertImport(ImportedFileRecord record) =>\n",
+              "  @override\n  Future<ImportedFileRecord?> completedImportByHash(String fileHash) async {\n"
+              "    final rows =\n"
+              "        await (_db.select(_db.timelineImports)\n"
+              "              ..where(\n"
+              "                (table) =>\n"
+              "                    table.status.equals('completed') &\n"
+              "                    table.fileHash.equals(fileHash),\n"
+              "              )\n"
+              "              ..orderBy([(table) => OrderingTerm.desc(table.id)])\n"
+              "              ..limit(1))\n"
+              "            .get();\n"
+              "    return rows.isEmpty ? null : _importToDomain(rows.first);\n"
+              "  }\n\n"
+              "  @override\n  Future<int> insertImport(ImportedFileRecord record) =>\n",
+          )
+
+          replace(
+              'lib/infrastructure/database/resettable_kurashilog_repository.dart',
+              "  @override\n  Future<int> insertImport(ImportedFileRecord record) =>\n",
+              "  @override\n  Future<ImportedFileRecord?> completedImportByHash(String fileHash) =>\n"
+              "      _run((repository) => repository.completedImportByHash(fileHash));\n\n"
+              "  @override\n  Future<int> insertImport(ImportedFileRecord record) =>\n",
+          )
+
+          replace(
+              'lib/application/use_cases/import_use_case.dart',
+              "    final startedAt = DateTime.now();\n",
+              "    final completed = await repository.completedImportByHash(fileHash);\n"
+              "    if (completed != null) {\n"
+              "      return ImportResult(\n"
+              "        ok: true,\n"
+              "        sourceMinAt: completed.sourceMinAt,\n"
+              "        sourceMaxAt: completed.sourceMaxAt,\n"
+              "      );\n"
+              "    }\n\n"
+              "    final startedAt = DateTime.now();\n",
+          )
+          replace(
+              'lib/application/use_cases/import_use_case.dart',
+              "        onProgress?.call(\n"
+              "          const ImportProgress(ImportStage.clustering, percent: 75),\n"
+              "        );\n"
+              "        await analysis.rebuildAll();\n",
+              "        if (addedVisits > 0 || addedMovements > 0) {\n"
+              "          onProgress?.call(\n"
+              "            const ImportProgress(ImportStage.clustering, percent: 75),\n"
+              "          );\n"
+              "          await analysis.rebuildAll();\n"
+              "        }\n",
+          )
+          PY
+          rm .github/workflows/diagnose-22-incremental.yml
+          rm .github/workflows/one-shot-22-integrate.yml
+          dart format \
+            lib/application/import/incremental_import.dart \
+            lib/application/repositories/kurashilog_repository.dart \
+            lib/application/use_cases/import_use_case.dart \
+            lib/infrastructure/database/kurashilog_repository_impl.dart \
+            lib/infrastructure/database/resettable_kurashilog_repository.dart \
+            test/application/import/incremental_import_test.dart \
+            test/application/import/incremental_import_use_case_test.dart
+          flutter pub get
+          flutter test \
+            test/application/import/incremental_import_test.dart \
+            test/application/import/incremental_import_use_case_test.dart \
+            test/application/use_cases/import_use_case_regression_test.dart
+          git diff --check
+      - name: Commit integrated implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: skip duplicate Timeline parsing and redundant analysis'
+          git push origin HEAD:agent/22-incremental-import
