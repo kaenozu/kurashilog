@@ -126,7 +126,7 @@ class ChangePointDetector {
         baseline.timeOfDayDistribution,
         candidate.timeOfDayDistribution,
       ),
-    ].reduce(math.max);
+    ].reduce((a, b) => math.max(a, b).toDouble());
     return distance < policy.minimumScore / 2;
   }
 
@@ -142,13 +142,13 @@ class ChangePointDetector {
       final bv = bTotal == 0 ? 0 : (b[key] ?? 0).abs() / bTotal;
       distance += (av - bv).abs();
     }
-    return (distance / 2).clamp(0, 1);
+    return (distance / 2).clamp(0, 1).toDouble();
   }
 
   double _relativeDistance(double a, double b) {
     final denominator = math.max(a.abs(), b.abs());
     if (denominator == 0) return 0;
-    return ((a - b).abs() / denominator).clamp(0, 1);
+    return ((a - b).abs() / denominator).clamp(0, 1).toDouble();
   }
 
   List<ChangePointCandidate> _mergeNearby(List<ChangePointCandidate> raw) {
@@ -160,9 +160,9 @@ class ChangePointDetector {
         continue;
       }
       final previous = merged.last;
-      final gap = candidate.after.startInclusive
-          .difference(previous.after.startInclusive)
-          .inDays;
+      final gap = candidate.after.startInclusive.differenceInDays(
+        previous.after.startInclusive,
+      );
       if (gap > policy.mergeDistanceDays) {
         merged.add(candidate);
         continue;
