@@ -1,0 +1,43 @@
+name: One-shot validate change point domain
+
+on:
+  pull_request:
+    branches:
+      - agent/17-insight-ranking
+    paths:
+      - '.github/workflows/one-shot-format-19.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: agent/19-change-point-domain
+          fetch-depth: 0
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
+        with:
+          flutter-version: 3.44.0
+          channel: stable
+          cache: true
+      - name: Format and validate
+        run: |
+          rm .github/workflows/one-shot-format-19.yml
+          dart format \
+            lib/domain/change_detection/change_point.dart \
+            lib/domain/change_detection/change_point_detector.dart \
+            test/domain/change_point_detector_test.dart
+          flutter pub get
+          flutter test test/domain/change_point_detector_test.dart
+          git diff --check
+      - name: Commit validated implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: validate durable life change points'
+          git push origin HEAD:agent/19-change-point-domain
