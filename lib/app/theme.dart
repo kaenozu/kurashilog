@@ -85,7 +85,7 @@ class KurashilogTheme {
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(KurashilogRadius.sm),
+          borderRadius: BorderRadius.circular(KurashilogRadius.medium),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
