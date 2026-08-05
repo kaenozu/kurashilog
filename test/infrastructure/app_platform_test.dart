@@ -23,9 +23,7 @@ void main() {
         return 'locationSources';
       });
 
-      final result = await AppPlatform(
-        channel: channel,
-      ).openLocationSettings();
+      final result = await AppPlatform(channel: channel).openLocationSettings();
 
       expect(received?.method, 'openLocationSettings');
       expect(received?.arguments, isNull);
@@ -38,9 +36,7 @@ void main() {
         (_) async => 'generalSettings',
       );
 
-      final result = await AppPlatform(
-        channel: channel,
-      ).openLocationSettings();
+      final result = await AppPlatform(channel: channel).openLocationSettings();
 
       expect(result, LocationSettingsDestination.generalSettings);
     });
@@ -72,16 +68,8 @@ void main() {
         AppPlatform(channel: channel).openLocationSettings(),
         throwsA(
           isA<PlatformException>()
-              .having(
-                (error) => error.code,
-                'code',
-                'ACTIVITY_NOT_FOUND',
-              )
-              .having(
-                (error) => error.message,
-                'message',
-                '設定画面を開けませんでした',
-              ),
+              .having((error) => error.code, 'code', 'ACTIVITY_NOT_FOUND')
+              .having((error) => error.message, 'message', '設定画面を開けませんでした'),
         ),
       );
     });
@@ -89,10 +77,7 @@ void main() {
 
   test('picker cancellation and no pending share remain null', () async {
     await messenger.setMockMethodCallHandler(channel, (call) async {
-      expect(
-        call.method,
-        anyOf('pickJsonFile', 'takeSharedFile'),
-      );
+      expect(call.method, anyOf('pickJsonFile', 'takeSharedFile'));
       return null;
     });
     final platform = AppPlatform(channel: channel);
@@ -101,20 +86,21 @@ void main() {
     expect(await platform.takeSharedFile(), isNull);
   });
 
-  test('copyUriToCache sends the URI only across the private channel', () async {
-    const uri = 'content://private-provider/timeline';
-    await messenger.setMockMethodCallHandler(channel, (call) async {
-      expect(call.method, 'copyUriToCache');
-      expect(call.arguments, <String, Object?>{'uri': uri});
-      return '/private/cache/timeline.json';
-    });
+  test(
+    'copyUriToCache sends the URI only across the private channel',
+    () async {
+      const uri = 'content://private-provider/timeline';
+      await messenger.setMockMethodCallHandler(channel, (call) async {
+        expect(call.method, 'copyUriToCache');
+        expect(call.arguments, <String, Object?>{'uri': uri});
+        return '/private/cache/timeline.json';
+      });
 
-    final result = await AppPlatform(
-      channel: channel,
-    ).copyUriToCache(uri);
+      final result = await AppPlatform(channel: channel).copyUriToCache(uri);
 
-    expect(result, '/private/cache/timeline.json');
-  });
+      expect(result, '/private/cache/timeline.json');
+    },
+  );
 
   test('copyUriToCache rejects a null native path', () async {
     await messenger.setMockMethodCallHandler(channel, (_) async => null);
@@ -151,19 +137,22 @@ void main() {
     expect(await file.exists(), isFalse);
   });
 
-  test('Android source uses public intents and redacts private identifiers', () {
-    final source = File(
-      'android/app/src/main/kotlin/com/kurashilog/kurashilog/'
-      'MainActivity.kt',
-    ).readAsStringSync();
+  test(
+    'Android source uses public intents and redacts private identifiers',
+    () {
+      final source = File(
+        'android/app/src/main/kotlin/com/kurashilog/kurashilog/'
+        'MainActivity.kt',
+      ).readAsStringSync();
 
-    expect(source, contains('Settings.ACTION_LOCATION_SOURCE_SETTINGS'));
-    expect(source, contains('Settings.ACTION_SETTINGS'));
-    expect(source, contains('ACTIVITY_NOT_FOUND'));
-    expect(source, contains('SECURITY_ERROR'));
-    expect(source, contains('PLATFORM_ERROR'));
-    expect(source, isNot(contains(r'cannot open $uri')));
-    expect(source, isNot(contains('e.message')));
-    expect(source, isNot(contains('result.error("IO_ERROR", uri')));
-  });
+      expect(source, contains('Settings.ACTION_LOCATION_SOURCE_SETTINGS'));
+      expect(source, contains('Settings.ACTION_SETTINGS'));
+      expect(source, contains('ACTIVITY_NOT_FOUND'));
+      expect(source, contains('SECURITY_ERROR'));
+      expect(source, contains('PLATFORM_ERROR'));
+      expect(source, isNot(contains(r'cannot open $uri')));
+      expect(source, isNot(contains('e.message')));
+      expect(source, isNot(contains('result.error("IO_ERROR", uri')));
+    },
+  );
 }

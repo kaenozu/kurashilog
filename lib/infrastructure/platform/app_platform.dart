@@ -3,10 +3,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 /// Androidが開いた公開設定画面。
-enum LocationSettingsDestination {
-  locationSources,
-  generalSettings,
-}
+enum LocationSettingsDestination { locationSources, generalSettings }
 
 /// ネイティブ（Android）との橋渡し（設計書 M10 PlatformBridge）。
 ///
