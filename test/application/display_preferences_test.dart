@@ -6,8 +6,11 @@ void main() {
   test('formats metric and imperial distances consistently', () {
     expect(formatDistance(999, DistanceUnit.km), '999m');
     expect(formatDistance(1500, DistanceUnit.km), '1.5km');
+    expect(formatDistance(0, DistanceUnit.mi), '0.0mi');
+    expect(formatDistance(100, DistanceUnit.mi), '0.1mi');
     expect(formatDistance(1609, DistanceUnit.mi), '1.0mi');
     expect(formatDistance(-1, DistanceUnit.km), '0m');
+    expect(formatDistance(-1, DistanceUnit.mi), '0.0mi');
   });
 
   test('orders week labels and boundaries by preference', () {
