@@ -38,7 +38,8 @@ jobs:
           test -n "$manifest"
           ! grep -q 'android.permission.INTERNET' "$manifest"
           ! grep -R --line-number -E 'org\.jetbrains\.kotlin\.android|kotlin-android' android/app android/settings.gradle.kts
-          ! grep -q '^  jni:' pubspec.lock
+          grep -q 'e4f7b3409a72cb80dc21cb8556e5d205353cb23b' pubspec.lock
+          grep -q 'url: "https://github.com/dart-lang/native.git"' pubspec.lock
           git diff --check
 
       - name: Commit verified migration
