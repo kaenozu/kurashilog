@@ -17,7 +17,11 @@ void main() {
     'private Timeline preview and import complete with privacy-safe evidence',
     () async {
       final input = File(_inputPath);
-      expect(await input.exists(), isTrue, reason: 'private input does not exist');
+      expect(
+        await input.exists(),
+        isTrue,
+        reason: 'private input does not exist',
+      );
       final inputBytes = await input.length();
       expect(inputBytes, greaterThan(0));
 
@@ -46,7 +50,11 @@ void main() {
         final previewWatch = Stopwatch()..start();
         final preview = await useCase.previewFile(_inputPath);
         previewWatch.stop();
-        expect(preview.ok, isTrue, reason: 'preview failed: ${preview.errorCode}');
+        expect(
+          preview.ok,
+          isTrue,
+          reason: 'preview failed: ${preview.errorCode}',
+        );
 
         final importWatch = Stopwatch()..start();
         final imported = await useCase.importFile(
@@ -55,7 +63,11 @@ void main() {
           onProgress: (value) => progress.add(value.stage.name),
         );
         importWatch.stop();
-        expect(imported.ok, isTrue, reason: 'import failed: ${imported.errorCode}');
+        expect(
+          imported.ok,
+          isTrue,
+          reason: 'import failed: ${imported.errorCode}',
+        );
 
         final visits = await repository.countVisits();
         final movements = await repository.countMovements();
@@ -71,7 +83,11 @@ void main() {
           previewWarnings: preview.warnings,
         );
         reimportWatch.stop();
-        expect(reimported.ok, isTrue, reason: 'reimport failed: ${reimported.errorCode}');
+        expect(
+          reimported.ok,
+          isTrue,
+          reason: 'reimport failed: ${reimported.errorCode}',
+        );
         expect(reimported.addedVisits, 0);
         expect(reimported.addedMovements, 0);
         expect(await repository.countVisits(), visits);
