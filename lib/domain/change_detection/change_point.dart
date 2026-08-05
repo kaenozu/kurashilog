@@ -1,6 +1,6 @@
 library;
 
-import '../comparison/comparison.dart';
+import '../models/comparison.dart';
 
 /// 一定窓で集計した匿名の生活特徴。
 class LifeWindowSnapshot {
@@ -73,13 +73,12 @@ class LifeMilestone {
     String? title,
     LocalDateRange? range,
     String? note,
-  }) =>
-      LifeMilestone(
-        id: id,
-        title: title ?? this.title,
-        range: range ?? this.range,
-        createdAt: createdAt,
-        note: note ?? this.note,
-        sourceCandidateKey: sourceCandidateKey,
-      );
+  }) => LifeMilestone(
+    id: id,
+    title: title ?? this.title,
+    range: range ?? this.range,
+    createdAt: createdAt,
+    note: note ?? this.note,
+    sourceCandidateKey: sourceCandidateKey,
+  );
 }
