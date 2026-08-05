@@ -5,8 +5,7 @@ import '../models/comparison.dart';
 final class ComparisonQualityResult {
   factory ComparisonQualityResult({
     required ComparisonQuality quality,
-    Iterable<ComparisonWarningCode> warnings =
-        const <ComparisonWarningCode>[],
+    Iterable<ComparisonWarningCode> warnings = const <ComparisonWarningCode>[],
   }) => ComparisonQualityResult._(
     quality,
     Set<ComparisonWarningCode>.unmodifiable(warnings),
@@ -24,8 +23,11 @@ final class ComparisonPeriodAligner {
 
   PeriodAlignmentResult align(ComparisonRequest request) {
     return switch (request.alignment) {
-      ComparisonAlignment.exact || ComparisonAlignment.milestone =>
-        _result(request, request.periodA, request.periodB),
+      ComparisonAlignment.exact || ComparisonAlignment.milestone => _result(
+        request,
+        request.periodA,
+        request.periodB,
+      ),
       ComparisonAlignment.sameElapsedDays => _sameElapsedDays(request),
       ComparisonAlignment.sameMonth => _sameMonth(request),
       ComparisonAlignment.sameSeason => _sameSeason(request),
@@ -115,8 +117,7 @@ final class ComparisonPeriodAligner {
     ComparisonRequest request,
     LocalDateRange effectiveA,
     LocalDateRange effectiveB, [
-    Iterable<ComparisonWarningCode> warnings =
-        const <ComparisonWarningCode>[],
+    Iterable<ComparisonWarningCode> warnings = const <ComparisonWarningCode>[],
   ]) => PeriodAlignmentResult(
     requestedA: request.periodA,
     requestedB: request.periodB,
@@ -235,10 +236,7 @@ final class MetricComparator {
     required ComparisonEvidence evidence,
   }) {
     final rawDelta = _delta(a.raw, b.raw);
-    final normalizedDelta = _delta(
-      a.perRepresentedDay,
-      b.perRepresentedDay,
-    );
+    final normalizedDelta = _delta(a.perRepresentedDay, b.perRepresentedDay);
     final percentageBaseA = a.perRepresentedDay ?? a.raw;
     final percentageBaseB = b.perRepresentedDay ?? b.raw;
     final percentageDelta = _symmetricPercentage(
@@ -254,15 +252,12 @@ final class MetricComparator {
       rawDelta: rawDelta,
       normalizedDelta: normalizedDelta,
       percentageDelta: percentageDelta,
-      quality: unavailable
-          ? ComparisonQuality.insufficient
-          : periodQuality,
+      quality: unavailable ? ComparisonQuality.insufficient : periodQuality,
       evidence: evidence,
     );
   }
 
-  double? _delta(double? a, double? b) =>
-      a == null || b == null ? null : a - b;
+  double? _delta(double? a, double? b) => a == null || b == null ? null : a - b;
 
   /// Uses the average absolute magnitude as denominator. Unlike baseline-only
   /// percentages, reversing A/B preserves magnitude and only changes sign.

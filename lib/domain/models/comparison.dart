@@ -35,8 +35,7 @@ final class LocalDate implements Comparable<LocalDate> {
     return LocalDate(value.year, value.month, value.day);
   }
 
-  int differenceInDays(LocalDate other) =>
-      _utc.difference(other._utc).inDays;
+  int differenceInDays(LocalDate other) => _utc.difference(other._utc).inDays;
 
   /// Copies the month/day into [targetYear], clamping leap-day or month-end
   /// values to the last valid day in that month.
@@ -81,11 +80,7 @@ final class LocalDateRange {
     if (normalizedTimeZone.isEmpty) {
       throw ArgumentError.value(timeZoneId, 'timeZoneId', 'Must not be empty');
     }
-    return LocalDateRange._(
-      startInclusive,
-      endExclusive,
-      normalizedTimeZone,
-    );
+    return LocalDateRange._(startInclusive, endExclusive, normalizedTimeZone);
   }
 
   const LocalDateRange._(
@@ -148,8 +143,7 @@ final class LocalDateRange {
   bool get isEmpty => calendarDays == 0;
 
   bool contains(LocalDate date) =>
-      date.compareTo(startInclusive) >= 0 &&
-      date.compareTo(endExclusive) < 0;
+      date.compareTo(startInclusive) >= 0 && date.compareTo(endExclusive) < 0;
 
   LocalDateRange copyWith({
     LocalDate? startInclusive,
@@ -229,9 +223,9 @@ final class ComparisonRequest {
     alignment,
     Set<ComparisonMetricId>.unmodifiable(metrics),
     Set<String>.unmodifiable(
-      excludedClusterIds.map((value) => value.trim()).where(
-        (value) => value.isNotEmpty,
-      ),
+      excludedClusterIds
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty),
     ),
   );
 

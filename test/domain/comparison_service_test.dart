@@ -71,13 +71,19 @@ void main() {
 
     test('builds leap-month and cross-year winter presets', () {
       expect(
-        LocalDateRange.month(year: 2024, month: 2, timeZoneId: zone)
-            .calendarDays,
+        LocalDateRange.month(
+          year: 2024,
+          month: 2,
+          timeZoneId: zone,
+        ).calendarDays,
         29,
       );
       expect(
-        LocalDateRange.month(year: 2025, month: 2, timeZoneId: zone)
-            .calendarDays,
+        LocalDateRange.month(
+          year: 2025,
+          month: 2,
+          timeZoneId: zone,
+        ).calendarDays,
         28,
       );
       final winter = LocalDateRange.season(
@@ -133,10 +139,7 @@ void main() {
       expect(forward.effectiveA.calendarDays, 60);
       expect(forward.effectiveB.calendarDays, 60);
       expect(forward.effectiveB.endExclusive, LocalDate(2023, 3, 2));
-      expect(
-        forward.warnings,
-        contains(ComparisonWarningCode.leapDayClamped),
-      );
+      expect(forward.warnings, contains(ComparisonWarningCode.leapDayClamped));
       expect(reverse.effectiveA, forward.effectiveB);
       expect(reverse.effectiveB, forward.effectiveA);
       expect(reverse.warnings, forward.warnings);
@@ -198,15 +201,18 @@ void main() {
       );
     });
 
-    test('marks medium coverage reference-only without directional certainty', () {
-      final result = policy.evaluate(
-        periodA: range(2026, 1, 1, 2026, 1, 31),
-        periodB: range(2025, 1, 1, 2025, 1, 31),
-        coverageA: coverage(expected: 30, represented: 18),
-        coverageB: coverage(expected: 30, represented: 21),
-      );
-      expect(result.quality, ComparisonQuality.referenceOnly);
-    });
+    test(
+      'marks medium coverage reference-only without directional certainty',
+      () {
+        final result = policy.evaluate(
+          periodA: range(2026, 1, 1, 2026, 1, 31),
+          periodB: range(2025, 1, 1, 2025, 1, 31),
+          coverageA: coverage(expected: 30, represented: 18),
+          coverageB: coverage(expected: 30, represented: 21),
+        );
+        expect(result.quality, ComparisonQuality.referenceOnly);
+      },
+    );
 
     test('marks low coverage and empty periods insufficient', () {
       final low = policy.evaluate(
@@ -220,10 +226,7 @@ void main() {
         low.warnings,
         contains(ComparisonWarningCode.insufficientCoverage),
       );
-      expect(
-        low.warnings,
-        contains(ComparisonWarningCode.coverageImbalance),
-      );
+      expect(low.warnings, contains(ComparisonWarningCode.coverageImbalance));
 
       final empty = policy.evaluate(
         periodA: range(2026, 1, 1, 2026, 1, 1),
@@ -321,31 +324,34 @@ void main() {
       expect(result.percentageDelta, isNull);
     });
 
-    test('keeps unavailable metrics null instead of converting them to zero', () {
-      final result = comparator.compare(
-        id: ComparisonMetricId.activityRadius,
-        a: MetricValue(
-          raw: null,
-          perRepresentedDay: null,
-          unit: 'm',
-          contributingDays: 0,
-          coverage: fullCoverage,
-        ),
-        b: MetricValue(
-          raw: 1200,
-          perRepresentedDay: 120,
-          unit: 'm',
-          contributingDays: 10,
-          coverage: fullCoverage,
-        ),
-        periodQuality: ComparisonQuality.comparable,
-        evidence: evidence,
-      );
-      expect(result.rawDelta, isNull);
-      expect(result.normalizedDelta, isNull);
-      expect(result.percentageDelta, isNull);
-      expect(result.quality, ComparisonQuality.insufficient);
-    });
+    test(
+      'keeps unavailable metrics null instead of converting them to zero',
+      () {
+        final result = comparator.compare(
+          id: ComparisonMetricId.activityRadius,
+          a: MetricValue(
+            raw: null,
+            perRepresentedDay: null,
+            unit: 'm',
+            contributingDays: 0,
+            coverage: fullCoverage,
+          ),
+          b: MetricValue(
+            raw: 1200,
+            perRepresentedDay: 120,
+            unit: 'm',
+            contributingDays: 10,
+            coverage: fullCoverage,
+          ),
+          periodQuality: ComparisonQuality.comparable,
+          evidence: evidence,
+        );
+        expect(result.rawDelta, isNull);
+        expect(result.normalizedDelta, isNull);
+        expect(result.percentageDelta, isNull);
+        expect(result.quality, ComparisonQuality.insufficient);
+      },
+    );
   });
 
   test('comparison request filters blank exclusions and is immutable', () {
