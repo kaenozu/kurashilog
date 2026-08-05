@@ -70,8 +70,7 @@ class PlaceClusters extends Table {
   BoolColumn get excluded => boolean().withDefault(const Constant(false))();
 
   /// visible | hideName | blurMap | exclude
-  TextColumn get privacyMode =>
-      text().withDefault(const Constant('visible'))();
+  TextColumn get privacyMode => text().withDefault(const Constant('visible'))();
 }
 
 @DataClassName('PlaceLabelRow')

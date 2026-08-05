@@ -1677,11 +1677,7 @@ class MovementRow extends DataClass implements Insertable<MovementRow> {
   final String distanceMethod;
   final String? activityType;
   final double? confidence;
-
-  /// 経路点列（"lat,lng;lat,lng" 形式）。距離の推定に使う。
   final String? pathJson;
-
-  /// 日常移動集計から除外するか（異常速度など）。
   final bool validDistance;
   const MovementRow({
     required this.id,
@@ -2255,6 +2251,18 @@ class $PlaceClustersTable extends PlaceClusters
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _privacyModeMeta = const VerificationMeta(
+    'privacyMode',
+  );
+  @override
+  late final GeneratedColumn<String> privacyMode = GeneratedColumn<String>(
+    'privacy_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('visible'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2268,6 +2276,7 @@ class $PlaceClustersTable extends PlaceClusters
     lastAt,
     labelId,
     excluded,
+    privacyMode,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2369,6 +2378,15 @@ class $PlaceClustersTable extends PlaceClusters
         excluded.isAcceptableOrUnknown(data['excluded']!, _excludedMeta),
       );
     }
+    if (data.containsKey('privacy_mode')) {
+      context.handle(
+        _privacyModeMeta,
+        privacyMode.isAcceptableOrUnknown(
+          data['privacy_mode']!,
+          _privacyModeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2422,6 +2440,10 @@ class $PlaceClustersTable extends PlaceClusters
         DriftSqlType.bool,
         data['${effectivePrefix}excluded'],
       )!,
+      privacyMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}privacy_mode'],
+      )!,
     );
   }
 
@@ -2442,7 +2464,12 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
   final DateTime firstAt;
   final DateTime lastAt;
   final int? labelId;
+
+  /// Legacy compatibility. New code synchronizes this with privacyMode=exclude.
   final bool excluded;
+
+  /// visible | hideName | blurMap | exclude
+  final String privacyMode;
   const PlaceClusterRow({
     required this.id,
     required this.stableKey,
@@ -2455,6 +2482,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
     required this.lastAt,
     this.labelId,
     required this.excluded,
+    required this.privacyMode,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2472,6 +2500,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
       map['label_id'] = Variable<int>(labelId);
     }
     map['excluded'] = Variable<bool>(excluded);
+    map['privacy_mode'] = Variable<String>(privacyMode);
     return map;
   }
 
@@ -2490,6 +2519,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
           ? const Value.absent()
           : Value(labelId),
       excluded: Value(excluded),
+      privacyMode: Value(privacyMode),
     );
   }
 
@@ -2510,6 +2540,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
       lastAt: serializer.fromJson<DateTime>(json['lastAt']),
       labelId: serializer.fromJson<int?>(json['labelId']),
       excluded: serializer.fromJson<bool>(json['excluded']),
+      privacyMode: serializer.fromJson<String>(json['privacyMode']),
     );
   }
   @override
@@ -2527,6 +2558,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
       'lastAt': serializer.toJson<DateTime>(lastAt),
       'labelId': serializer.toJson<int?>(labelId),
       'excluded': serializer.toJson<bool>(excluded),
+      'privacyMode': serializer.toJson<String>(privacyMode),
     };
   }
 
@@ -2542,6 +2574,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
     DateTime? lastAt,
     Value<int?> labelId = const Value.absent(),
     bool? excluded,
+    String? privacyMode,
   }) => PlaceClusterRow(
     id: id ?? this.id,
     stableKey: stableKey ?? this.stableKey,
@@ -2554,6 +2587,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
     lastAt: lastAt ?? this.lastAt,
     labelId: labelId.present ? labelId.value : this.labelId,
     excluded: excluded ?? this.excluded,
+    privacyMode: privacyMode ?? this.privacyMode,
   );
   PlaceClusterRow copyWithCompanion(PlaceClustersCompanion data) {
     return PlaceClusterRow(
@@ -2576,6 +2610,9 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
       lastAt: data.lastAt.present ? data.lastAt.value : this.lastAt,
       labelId: data.labelId.present ? data.labelId.value : this.labelId,
       excluded: data.excluded.present ? data.excluded.value : this.excluded,
+      privacyMode: data.privacyMode.present
+          ? data.privacyMode.value
+          : this.privacyMode,
     );
   }
 
@@ -2592,7 +2629,8 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
           ..write('firstAt: $firstAt, ')
           ..write('lastAt: $lastAt, ')
           ..write('labelId: $labelId, ')
-          ..write('excluded: $excluded')
+          ..write('excluded: $excluded, ')
+          ..write('privacyMode: $privacyMode')
           ..write(')'))
         .toString();
   }
@@ -2610,6 +2648,7 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
     lastAt,
     labelId,
     excluded,
+    privacyMode,
   );
   @override
   bool operator ==(Object other) =>
@@ -2625,7 +2664,8 @@ class PlaceClusterRow extends DataClass implements Insertable<PlaceClusterRow> {
           other.firstAt == this.firstAt &&
           other.lastAt == this.lastAt &&
           other.labelId == this.labelId &&
-          other.excluded == this.excluded);
+          other.excluded == this.excluded &&
+          other.privacyMode == this.privacyMode);
 }
 
 class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
@@ -2640,6 +2680,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
   final Value<DateTime> lastAt;
   final Value<int?> labelId;
   final Value<bool> excluded;
+  final Value<String> privacyMode;
   const PlaceClustersCompanion({
     this.id = const Value.absent(),
     this.stableKey = const Value.absent(),
@@ -2652,6 +2693,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
     this.lastAt = const Value.absent(),
     this.labelId = const Value.absent(),
     this.excluded = const Value.absent(),
+    this.privacyMode = const Value.absent(),
   });
   PlaceClustersCompanion.insert({
     this.id = const Value.absent(),
@@ -2665,6 +2707,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
     required DateTime lastAt,
     this.labelId = const Value.absent(),
     this.excluded = const Value.absent(),
+    this.privacyMode = const Value.absent(),
   }) : stableKey = Value(stableKey),
        centroidLatE7 = Value(centroidLatE7),
        centroidLngE7 = Value(centroidLngE7),
@@ -2685,6 +2728,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
     Expression<DateTime>? lastAt,
     Expression<int>? labelId,
     Expression<bool>? excluded,
+    Expression<String>? privacyMode,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2698,6 +2742,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
       if (lastAt != null) 'last_at': lastAt,
       if (labelId != null) 'label_id': labelId,
       if (excluded != null) 'excluded': excluded,
+      if (privacyMode != null) 'privacy_mode': privacyMode,
     });
   }
 
@@ -2713,6 +2758,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
     Value<DateTime>? lastAt,
     Value<int?>? labelId,
     Value<bool>? excluded,
+    Value<String>? privacyMode,
   }) {
     return PlaceClustersCompanion(
       id: id ?? this.id,
@@ -2726,6 +2772,7 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
       lastAt: lastAt ?? this.lastAt,
       labelId: labelId ?? this.labelId,
       excluded: excluded ?? this.excluded,
+      privacyMode: privacyMode ?? this.privacyMode,
     );
   }
 
@@ -2765,6 +2812,9 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
     if (excluded.present) {
       map['excluded'] = Variable<bool>(excluded.value);
     }
+    if (privacyMode.present) {
+      map['privacy_mode'] = Variable<String>(privacyMode.value);
+    }
     return map;
   }
 
@@ -2781,7 +2831,8 @@ class PlaceClustersCompanion extends UpdateCompanion<PlaceClusterRow> {
           ..write('firstAt: $firstAt, ')
           ..write('lastAt: $lastAt, ')
           ..write('labelId: $labelId, ')
-          ..write('excluded: $excluded')
+          ..write('excluded: $excluded, ')
+          ..write('privacyMode: $privacyMode')
           ..write(')'))
         .toString();
   }
@@ -4033,8 +4084,6 @@ class MonthlySummaryRow extends DataClass
   final int newClusters;
   final String? maxDistanceDate;
   final DateTime calculatedAt;
-
-  /// 当月に訪問のあったクラスタ ID 一覧（前月比の新規地点算出用）。
   final String clusterIdsJson;
   const MonthlySummaryRow({
     required this.yearMonth,
@@ -4528,6 +4577,10 @@ class $InsightsTable extends Insights
 
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {periodKey, ruleId},
+  ];
   @override
   InsightRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
@@ -6210,6 +6263,7 @@ typedef $$PlaceClustersTableCreateCompanionBuilder =
       required DateTime lastAt,
       Value<int?> labelId,
       Value<bool> excluded,
+      Value<String> privacyMode,
     });
 typedef $$PlaceClustersTableUpdateCompanionBuilder =
     PlaceClustersCompanion Function({
@@ -6224,6 +6278,7 @@ typedef $$PlaceClustersTableUpdateCompanionBuilder =
       Value<DateTime> lastAt,
       Value<int?> labelId,
       Value<bool> excluded,
+      Value<String> privacyMode,
     });
 
 class $$PlaceClustersTableFilterComposer
@@ -6287,6 +6342,11 @@ class $$PlaceClustersTableFilterComposer
 
   ColumnFilters<bool> get excluded => $composableBuilder(
     column: $table.excluded,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get privacyMode => $composableBuilder(
+    column: $table.privacyMode,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6354,6 +6414,11 @@ class $$PlaceClustersTableOrderingComposer
     column: $table.excluded,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get privacyMode => $composableBuilder(
+    column: $table.privacyMode,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$PlaceClustersTableAnnotationComposer
@@ -6405,6 +6470,11 @@ class $$PlaceClustersTableAnnotationComposer
 
   GeneratedColumn<bool> get excluded =>
       $composableBuilder(column: $table.excluded, builder: (column) => column);
+
+  GeneratedColumn<String> get privacyMode => $composableBuilder(
+    column: $table.privacyMode,
+    builder: (column) => column,
+  );
 }
 
 class $$PlaceClustersTableTableManager
@@ -6449,6 +6519,7 @@ class $$PlaceClustersTableTableManager
                 Value<DateTime> lastAt = const Value.absent(),
                 Value<int?> labelId = const Value.absent(),
                 Value<bool> excluded = const Value.absent(),
+                Value<String> privacyMode = const Value.absent(),
               }) => PlaceClustersCompanion(
                 id: id,
                 stableKey: stableKey,
@@ -6461,6 +6532,7 @@ class $$PlaceClustersTableTableManager
                 lastAt: lastAt,
                 labelId: labelId,
                 excluded: excluded,
+                privacyMode: privacyMode,
               ),
           createCompanionCallback:
               ({
@@ -6475,6 +6547,7 @@ class $$PlaceClustersTableTableManager
                 required DateTime lastAt,
                 Value<int?> labelId = const Value.absent(),
                 Value<bool> excluded = const Value.absent(),
+                Value<String> privacyMode = const Value.absent(),
               }) => PlaceClustersCompanion.insert(
                 id: id,
                 stableKey: stableKey,
@@ -6487,6 +6560,7 @@ class $$PlaceClustersTableTableManager
                 lastAt: lastAt,
                 labelId: labelId,
                 excluded: excluded,
+                privacyMode: privacyMode,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

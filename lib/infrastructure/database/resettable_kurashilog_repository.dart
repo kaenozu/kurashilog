@@ -123,6 +123,14 @@ class ResettableKurashilogRepository implements KurashilogRepository {
       _run((repository) => repository.setClusterExcluded(clusterId, excluded));
 
   @override
+  Future<void> setClusterPrivacyMode(
+    int clusterId,
+    PlacePrivacyMode privacyMode,
+  ) => _run(
+    (repository) => repository.setClusterPrivacyMode(clusterId, privacyMode),
+  );
+
+  @override
   Future<int> insertLabel(StoredLabel label) =>
       _run((repository) => repository.insertLabel(label));
 

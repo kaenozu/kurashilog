@@ -5,16 +5,19 @@ import 'package:kurashilog/domain/privacy/place_privacy.dart';
 void main() {
   const projector = PlacePrivacyProjector();
 
-  test('visible app projection preserves traceability without changing source', () {
-    final cluster = sample(privacyMode: PlacePrivacyMode.visible);
-    final result = projector.forApp(cluster)!;
+  test(
+    'visible app projection preserves traceability without changing source',
+    () {
+      final cluster = sample(privacyMode: PlacePrivacyMode.visible);
+      final result = projector.forApp(cluster)!;
 
-    expect(result.sourceClusterId, cluster.id);
-    expect(result.displayName, '公園');
-    expect(result.mapPoint, cluster.centroid);
-    expect(result.nameRedacted, isFalse);
-    expect(result.locationBlurred, isFalse);
-  });
+      expect(result.sourceClusterId, cluster.id);
+      expect(result.displayName, '公園');
+      expect(result.mapPoint, cluster.centroid);
+      expect(result.nameRedacted, isFalse);
+      expect(result.locationBlurred, isFalse);
+    },
+  );
 
   test('hide-name mode removes name and category but keeps app analysis', () {
     final result = projector.forApp(
@@ -70,19 +73,18 @@ void main() {
 StoredCluster sample({
   required PlacePrivacyMode privacyMode,
   bool isBasePlace = false,
-}) =>
-    StoredCluster(
-      id: 42,
-      stableKey: 'anonymous-stable-key',
-      centroidLatE7: 356812345,
-      centroidLngE7: 1397671234,
-      radiusM: 100,
-      visitCount: 5,
-      dwellSeconds: 3600,
-      firstAt: DateTime.utc(2026, 1, 1),
-      lastAt: DateTime.utc(2026, 2, 1),
-      labelName: '公園',
-      category: 'park',
-      isBasePlace: isBasePlace,
-      privacyMode: privacyMode,
-    );
+}) => StoredCluster(
+  id: 42,
+  stableKey: 'anonymous-stable-key',
+  centroidLatE7: 356812345,
+  centroidLngE7: 1397671234,
+  radiusM: 100,
+  visitCount: 5,
+  dwellSeconds: 3600,
+  firstAt: DateTime.utc(2026, 1, 1),
+  lastAt: DateTime.utc(2026, 2, 1),
+  labelName: '公園',
+  category: 'park',
+  isBasePlace: isBasePlace,
+  privacyMode: privacyMode,
+);

@@ -72,9 +72,7 @@ class PlacePrivacyProjector {
       displayName: redact ? '非公開の場所' : cluster.displayName,
       category: redact ? null : cluster.category,
       // Sharing is safe by default: no coordinates or stable keys leave the app.
-      locationLabel: mode == PlacePrivacyMode.blurMap
-          ? 'おおよその位置'
-          : '位置情報は非公開',
+      locationLabel: mode == PlacePrivacyMode.blurMap ? 'おおよその位置' : '位置情報は非公開',
     );
   }
 

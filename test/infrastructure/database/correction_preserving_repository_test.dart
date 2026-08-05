@@ -57,23 +57,26 @@ void main() {
     },
   );
 
-  test('legacy exclusion remains an explicit exclusion after rebuild', () async {
-    final at = DateTime.utc(2026, 8, 4);
-    await repository.replaceAllClusters([
-      _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
-    ]);
-    final original = (await repository.allClusters()).single;
-    await repository.setClusterExcluded(original.id, true);
+  test(
+    'legacy exclusion remains an explicit exclusion after rebuild',
+    () async {
+      final at = DateTime.utc(2026, 8, 4);
+      await repository.replaceAllClusters([
+        _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
+      ]);
+      final original = (await repository.allClusters()).single;
+      await repository.setClusterExcluded(original.id, true);
 
-    await repository.replaceAllClusters([
-      _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
-    ]);
+      await repository.replaceAllClusters([
+        _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
+      ]);
 
-    final rebuilt = (await repository.allClusters()).single;
-    expect(rebuilt.excluded, isTrue);
-    expect(rebuilt.privacyMode, PlacePrivacyMode.exclude);
-    expect(rebuilt.excludedFromAnalysis, isTrue);
-  });
+      final rebuilt = (await repository.allClusters()).single;
+      expect(rebuilt.excluded, isTrue);
+      expect(rebuilt.privacyMode, PlacePrivacyMode.exclude);
+      expect(rebuilt.excludedFromAnalysis, isTrue);
+    },
+  );
 }
 
 StoredCluster _cluster(

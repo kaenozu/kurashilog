@@ -196,6 +196,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
             lastAt: cluster.lastAt,
             labelId: existing?.labelId,
             excluded: existing?.excluded ?? false,
+            privacyMode: PlacePrivacyMode.parse(
+              existing?.privacyMode ?? 'visible',
+              legacyExcluded: existing?.excluded ?? false,
+            ),
           ),
         );
       }).toList();
@@ -276,11 +280,26 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   }
 
   @override
-  Future<void> setClusterExcluded(int clusterId, bool excluded) async {
+  Future<void> setClusterExcluded(int clusterId, bool excluded) =>
+      setClusterPrivacyMode(
+        clusterId,
+        excluded ? PlacePrivacyMode.exclude : PlacePrivacyMode.visible,
+      );
+
+  @override
+  Future<void> setClusterPrivacyMode(
+    int clusterId,
+    PlacePrivacyMode privacyMode,
+  ) async {
     final updated =
-        await (_db.update(_db.placeClusters)
-              ..where((table) => table.id.equals(clusterId)))
-            .write(PlaceClustersCompanion(excluded: Value(excluded)));
+        await (_db.update(
+          _db.placeClusters,
+        )..where((table) => table.id.equals(clusterId))).write(
+          PlaceClustersCompanion(
+            excluded: Value(privacyMode == PlacePrivacyMode.exclude),
+            privacyMode: Value(privacyMode.name),
+          ),
+        );
     if (updated != 1) throw StateError('Cluster $clusterId was not found');
   }
 
@@ -562,7 +581,8 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         firstAt: cluster.firstAt,
         lastAt: cluster.lastAt,
         labelId: Value(cluster.labelId),
-        excluded: Value(cluster.excluded),
+        excluded: Value(cluster.excludedFromAnalysis),
+        privacyMode: Value(cluster.privacyMode.name),
       );
 
   StoredCluster _clusterToDomain(
@@ -580,6 +600,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     lastAt: cluster.lastAt,
     labelId: cluster.labelId,
     excluded: cluster.excluded,
+    privacyMode: PlacePrivacyMode.parse(
+      cluster.privacyMode,
+      legacyExcluded: cluster.excluded,
+    ),
     labelName: label?.displayName,
     category: label?.category,
     isBasePlace: label?.isBasePlace ?? false,
