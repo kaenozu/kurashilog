@@ -26,6 +26,7 @@ jobs:
           cache: true
       - name: Format and validate
         run: |
+          # v2: uses only the declared radius scale.
           rm .github/workflows/one-shot-format-20.yml
           dart format lib/app/theme.dart lib/app/design_system.dart test/app/design_system_test.dart
           flutter pub get
