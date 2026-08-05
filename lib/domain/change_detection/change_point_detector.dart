@@ -50,6 +50,9 @@ class ChangePointDetector {
           .every((window) => _similar(after, window));
       if (!persistent) continue;
 
+      // 1 windowだけ外れ、その後に元の生活へ戻った境界は新しい変化ではない。
+      if (index >= 2 && _similar(after, sorted[index - 2])) continue;
+
       raw.add(
         ChangePointCandidate(
           before: before.range,
