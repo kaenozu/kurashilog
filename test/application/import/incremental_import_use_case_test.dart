@@ -41,39 +41,45 @@ void main() {
     await directory.delete(recursive: true);
   });
 
-  test('same completed file returns zero without parsing or analysis', () async {
-    final file = File('${directory.path}/timeline.json');
-    await file.writeAsString('{}');
+  test(
+    'same completed file returns zero without parsing or analysis',
+    () async {
+      final file = File('${directory.path}/timeline.json');
+      await file.writeAsString('{}');
 
-    final first = await useCase.importFile(file.path);
-    final second = await useCase.importFile(file.path);
+      final first = await useCase.importFile(file.path);
+      final second = await useCase.importFile(file.path);
 
-    expect(first.ok, isTrue);
-    expect(first.addedVisits, 1);
-    expect(second.ok, isTrue);
-    expect(second.addedVisits, 0);
-    expect(second.addedMovements, 0);
-    expect(parser.parseCount, 1);
-    expect(analysis.rebuildCount, 1);
-    expect(await repository.countVisits(), 1);
-  });
+      expect(first.ok, isTrue);
+      expect(first.addedVisits, 1);
+      expect(second.ok, isTrue);
+      expect(second.addedVisits, 0);
+      expect(second.addedMovements, 0);
+      expect(parser.parseCount, 1);
+      expect(analysis.rebuildCount, 1);
+      expect(await repository.countVisits(), 1);
+    },
+  );
 
-  test('different overlapping file with no new source keys skips analysis', () async {
-    final firstFile = File('${directory.path}/first.json');
-    final secondFile = File('${directory.path}/second.json');
-    await firstFile.writeAsString('{}');
-    await secondFile.writeAsString('{"different":true}');
+  test(
+    'different overlapping file with no new source keys skips analysis',
+    () async {
+      final firstFile = File('${directory.path}/first.json');
+      final secondFile = File('${directory.path}/second.json');
+      await firstFile.writeAsString('{}');
+      await secondFile.writeAsString('{"different":true}');
 
-    final first = await useCase.importFile(firstFile.path);
-    final second = await useCase.importFile(secondFile.path);
+      final first = await useCase.importFile(firstFile.path);
+      final second = await useCase.importFile(secondFile.path);
 
-    expect(first.ok, isTrue);
-    expect(second.ok, isTrue);
-    expect(second.addedVisits, 0);
-    expect(parser.parseCount, 2);
-    expect(analysis.rebuildCount, 1);
-    expect(await repository.countVisits(), 1);
-  });
+      expect(first.ok, isTrue);
+      expect(second.ok, isTrue);
+      expect(second.addedVisits, 0);
+      expect(parser.parseCount, 2);
+      expect(analysis.rebuildCount, 1);
+      expect(await repository.countVisits(), 1);
+    },
+  );
 }
 
 class _CountingAnalysis extends AnalysisCoordinator {

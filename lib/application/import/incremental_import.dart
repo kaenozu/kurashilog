@@ -59,7 +59,8 @@ class IncrementalImportPlanner {
       );
     }
 
-    if (incomingSourceMinAt != null && !incomingSourceMinAt.isBefore(previousMax)) {
+    if (incomingSourceMinAt != null &&
+        !incomingSourceMinAt.isBefore(previousMax)) {
       return IncrementalImportPlan(
         mode: IncrementalImportMode.appendOnly,
         skipParsing: false,
