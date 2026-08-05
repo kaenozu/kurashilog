@@ -11,14 +11,14 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 
-  tearDown(() async {
-    await messenger.setMockMethodCallHandler(channel, null);
+  tearDown(() {
+    messenger.setMockMethodCallHandler(channel, null);
   });
 
   group('openLocationSettings', () {
     test('maps the direct public location settings destination', () async {
       MethodCall? received;
-      await messenger.setMockMethodCallHandler(channel, (call) async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
         received = call;
         return 'locationSources';
       });
@@ -31,7 +31,7 @@ void main() {
     });
 
     test('reports when Android opened general settings as fallback', () async {
-      await messenger.setMockMethodCallHandler(
+      messenger.setMockMethodCallHandler(
         channel,
         (_) async => 'generalSettings',
       );
@@ -42,7 +42,7 @@ void main() {
     });
 
     test('fails closed on an unknown native response', () async {
-      await messenger.setMockMethodCallHandler(channel, (_) async => 'other');
+      messenger.setMockMethodCallHandler(channel, (_) async => 'other');
 
       await expectLater(
         AppPlatform(channel: channel).openLocationSettings(),
@@ -57,7 +57,7 @@ void main() {
     });
 
     test('preserves structured native errors without guessing', () async {
-      await messenger.setMockMethodCallHandler(channel, (_) async {
+      messenger.setMockMethodCallHandler(channel, (_) async {
         throw PlatformException(
           code: 'ACTIVITY_NOT_FOUND',
           message: '設定画面を開けませんでした',
@@ -76,7 +76,7 @@ void main() {
   });
 
   test('picker cancellation and no pending share remain null', () async {
-    await messenger.setMockMethodCallHandler(channel, (call) async {
+    messenger.setMockMethodCallHandler(channel, (call) async {
       expect(call.method, anyOf('pickJsonFile', 'takeSharedFile'));
       return null;
     });
@@ -90,7 +90,7 @@ void main() {
     'copyUriToCache sends the URI only across the private channel',
     () async {
       const uri = 'content://private-provider/timeline';
-      await messenger.setMockMethodCallHandler(channel, (call) async {
+      messenger.setMockMethodCallHandler(channel, (call) async {
         expect(call.method, 'copyUriToCache');
         expect(call.arguments, <String, Object?>{'uri': uri});
         return '/private/cache/timeline.json';
@@ -103,7 +103,7 @@ void main() {
   );
 
   test('copyUriToCache rejects a null native path', () async {
-    await messenger.setMockMethodCallHandler(channel, (_) async => null);
+    messenger.setMockMethodCallHandler(channel, (_) async => null);
 
     await expectLater(
       AppPlatform(
