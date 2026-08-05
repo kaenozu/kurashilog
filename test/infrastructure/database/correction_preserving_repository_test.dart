@@ -34,7 +34,10 @@ void main() {
       ]);
       final original = (await repository.allClusters()).single;
       await repository.updateClusterLabel(original.id, labelId);
-      await repository.setClusterExcluded(original.id, true);
+      await repository.setClusterPrivacyMode(
+        original.id,
+        PlacePrivacyMode.hideName,
+      );
 
       // Put the nearby split first to prove it cannot steal the exact match.
       await repository.replaceAllClusters([
@@ -47,11 +50,30 @@ void main() {
           cluster.stableKey: cluster,
       };
       expect(rebuilt['exact']?.labelId, labelId);
-      expect(rebuilt['exact']?.excluded, isTrue);
+      expect(rebuilt['exact']?.privacyMode, PlacePrivacyMode.hideName);
+      expect(rebuilt['exact']?.excluded, isFalse);
       expect(rebuilt['nearby']?.labelId, isNull);
-      expect(rebuilt['nearby']?.excluded, isFalse);
+      expect(rebuilt['nearby']?.privacyMode, PlacePrivacyMode.visible);
     },
   );
+
+  test('legacy exclusion remains an explicit exclusion after rebuild', () async {
+    final at = DateTime.utc(2026, 8, 4);
+    await repository.replaceAllClusters([
+      _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
+    ]);
+    final original = (await repository.allClusters()).single;
+    await repository.setClusterExcluded(original.id, true);
+
+    await repository.replaceAllClusters([
+      _cluster(at, stableKey: 'legacy', centroidLatE7: 356812360),
+    ]);
+
+    final rebuilt = (await repository.allClusters()).single;
+    expect(rebuilt.excluded, isTrue);
+    expect(rebuilt.privacyMode, PlacePrivacyMode.exclude);
+    expect(rebuilt.excludedFromAnalysis, isTrue);
+  });
 }
 
 StoredCluster _cluster(
