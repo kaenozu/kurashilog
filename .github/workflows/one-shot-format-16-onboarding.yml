@@ -26,7 +26,7 @@ jobs:
           cache: true
       - name: Format and validate
         run: |
-          # v2: verifies scrollable large-text content and separate action semantics.
+          # v3: Flutter 3.44 lifecycle hooks are synchronous.
           rm .github/workflows/one-shot-format-16-onboarding.yml
           dart format \
             lib/features/onboarding/onboarding_screen.dart \
