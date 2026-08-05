@@ -1,0 +1,41 @@
+name: Comparison format preview
+
+on:
+  pull_request:
+    paths:
+      - 'lib/domain/models/comparison.dart'
+      - 'lib/domain/services/comparison_service.dart'
+      - 'test/domain/comparison_service_test.dart'
+      - '.github/workflows/comparison-format-preview.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Emit canonical Dart formatter output
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            lib/domain/models/comparison.dart
+            lib/domain/services/comparison_service.dart
+            test/domain/comparison_service_test.dart
+          )
+          dart format "${files[@]}"
+          for file in "${files[@]}"; do
+            echo "::group::BEGIN_FORMATTED:${file}"
+            cat "$file"
+            echo "END_FORMATTED:${file}"
+            echo "::endgroup::"
+          done
