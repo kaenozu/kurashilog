@@ -29,8 +29,9 @@ class ChangePointDetector {
       return const <ChangePointCandidate>[];
     }
 
-    final sorted = [...windows]
-      ..sort((a, b) => a.range.startInclusive.compareTo(b.range.startInclusive));
+    final sorted = [
+      ...windows,
+    ]..sort((a, b) => a.range.startInclusive.compareTo(b.range.startInclusive));
     final raw = <ChangePointCandidate>[];
 
     for (var index = 1; index < sorted.length; index++) {
@@ -74,43 +75,44 @@ class ChangePointDetector {
     LifeWindowSnapshot before,
     LifeWindowSnapshot after,
   ) {
-    final result = <ChangeEvidence>[
-      ChangeEvidence(
-        dimension: ChangeDimension.places,
-        score: _distributionDistance(
-          before.placeDistribution,
-          after.placeDistribution,
-        ),
-        description: 'よく訪れる場所の構成が変化しています',
-      ),
-      ChangeEvidence(
-        dimension: ChangeDimension.weekdays,
-        score: _distributionDistance(
-          before.weekdayDistribution,
-          after.weekdayDistribution,
-        ),
-        description: '曜日ごとの外出構成が変化しています',
-      ),
-      ChangeEvidence(
-        dimension: ChangeDimension.timeOfDay,
-        score: _distributionDistance(
-          before.timeOfDayDistribution,
-          after.timeOfDayDistribution,
-        ),
-        description: '時間帯ごとの行動構成が変化しています',
-      ),
-      if (before.lifeRadiusM != null && after.lifeRadiusM != null)
-        ChangeEvidence(
-          dimension: ChangeDimension.lifeRadius,
-          score: _relativeDistance(before.lifeRadiusM!, after.lifeRadiusM!),
-          description: '生活圏の広さが変化しています',
-        ),
-    ]..sort((a, b) {
-        final byScore = b.score.compareTo(a.score);
-        return byScore != 0
-            ? byScore
-            : a.dimension.index.compareTo(b.dimension.index);
-      });
+    final result =
+        <ChangeEvidence>[
+          ChangeEvidence(
+            dimension: ChangeDimension.places,
+            score: _distributionDistance(
+              before.placeDistribution,
+              after.placeDistribution,
+            ),
+            description: 'よく訪れる場所の構成が変化しています',
+          ),
+          ChangeEvidence(
+            dimension: ChangeDimension.weekdays,
+            score: _distributionDistance(
+              before.weekdayDistribution,
+              after.weekdayDistribution,
+            ),
+            description: '曜日ごとの外出構成が変化しています',
+          ),
+          ChangeEvidence(
+            dimension: ChangeDimension.timeOfDay,
+            score: _distributionDistance(
+              before.timeOfDayDistribution,
+              after.timeOfDayDistribution,
+            ),
+            description: '時間帯ごとの行動構成が変化しています',
+          ),
+          if (before.lifeRadiusM != null && after.lifeRadiusM != null)
+            ChangeEvidence(
+              dimension: ChangeDimension.lifeRadius,
+              score: _relativeDistance(before.lifeRadiusM!, after.lifeRadiusM!),
+              description: '生活圏の広さが変化しています',
+            ),
+        ]..sort((a, b) {
+          final byScore = b.score.compareTo(a.score);
+          return byScore != 0
+              ? byScore
+              : a.dimension.index.compareTo(b.dimension.index);
+        });
     return result.where((item) => item.score >= 0.12).toList(growable: false);
   }
 

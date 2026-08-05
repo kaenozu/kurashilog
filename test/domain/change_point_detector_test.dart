@@ -97,19 +97,15 @@ LifeWindowSnapshot snapshot(
   Map<String, double> weekdays = const <String, double>{'weekday': 4},
   Map<String, double> times = const <String, double>{'day': 4},
   double? radius = 10000,
-}) =>
-    LifeWindowSnapshot(
-      range: rangeForMonth(month),
-      coverageRatio: coverage,
-      activeDays: activeDays,
-      placeDistribution: places,
-      weekdayDistribution: weekdays,
-      timeOfDayDistribution: times,
-      lifeRadiusM: radius,
-    );
-
-LocalDateRange rangeForMonth(int month) => LocalDateRange.month(
-  year: 2026,
-  month: month,
-  timeZoneId: 'Asia/Tokyo',
+}) => LifeWindowSnapshot(
+  range: rangeForMonth(month),
+  coverageRatio: coverage,
+  activeDays: activeDays,
+  placeDistribution: places,
+  weekdayDistribution: weekdays,
+  timeOfDayDistribution: times,
+  lifeRadiusM: radius,
 );
+
+LocalDateRange rangeForMonth(int month) =>
+    LocalDateRange.month(year: 2026, month: month, timeZoneId: 'Asia/Tokyo');
