@@ -43,3 +43,9 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Private Timeline acceptance output and inputs must never be committed.
+.acceptance/
+acceptance-results/
+*.private-timeline.json
+*.private-timeline.zip
