@@ -5,8 +5,7 @@ const double metersPerMile = 1609.344;
 String formatDistance(int meters, DistanceUnit unit) {
   final safeMeters = meters < 0 ? 0 : meters;
   if (unit == DistanceUnit.mi) {
-    final miles = safeMeters / metersPerMile;
-    return miles < 0.1 ? '${safeMeters}m' : '${miles.toStringAsFixed(1)}mi';
+    return '${(safeMeters / metersPerMile).toStringAsFixed(1)}mi';
   }
   return safeMeters >= 1000
       ? '${(safeMeters / 1000).toStringAsFixed(1)}km'
