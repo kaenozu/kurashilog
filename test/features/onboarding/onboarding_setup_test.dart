@@ -27,8 +27,8 @@ void main() {
     await tester.pump();
     expect(find.text('設定を確認したら、このアプリへ戻ってください。'), findsOneWidget);
 
-    await tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
-    await tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
 
     expect(find.textContaining('設定から戻りました'), findsOneWidget);
