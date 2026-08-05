@@ -40,7 +40,10 @@ jobs:
               'lib/infrastructure/database/kurashilog_repository_impl.dart',
               "            excluded: existing?.excluded ?? false,\n",
               "            excluded: existing?.excluded ?? false,\n"
-              "            privacyMode: existing?.privacyMode ?? PlacePrivacyMode.visible,\n",
+              "            privacyMode: PlacePrivacyMode.parse(\n"
+              "              existing?.privacyMode ?? 'visible',\n"
+              "              legacyExcluded: existing?.excluded ?? false,\n"
+              "            ),\n",
           )
           replace(
               'lib/infrastructure/database/kurashilog_repository_impl.dart',
@@ -87,7 +90,6 @@ jobs:
               "    if (updated != 1) throw StateError('Cluster $clusterId was not found');\n"
               "  }\n",
           )
-
           replace(
               'lib/infrastructure/database/correction_preserving_repository.dart',
               "      await setClusterExcluded(cluster.id, correction?.excluded ?? false);\n",
@@ -99,7 +101,6 @@ jobs:
               "                : PlacePrivacyMode.visible),\n"
               "      );\n",
           )
-
           replace(
               'lib/infrastructure/database/resettable_kurashilog_repository.dart',
               "  @override\n  Future<void> setClusterExcluded(int clusterId, bool excluded) =>\n"
@@ -113,7 +114,6 @@ jobs:
               "    (repository) => repository.setClusterPrivacyMode(clusterId, privacyMode),\n"
               "  );\n",
           )
-
           replace(
               'lib/application/use_cases/places_use_case.dart',
               "  Future<void> setExcluded(int clusterId, bool excluded) async {\n"
