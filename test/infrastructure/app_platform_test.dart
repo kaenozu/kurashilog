@@ -137,7 +137,11 @@ void main() {
     final directory = await Directory.systemTemp.createTemp(
       'kurashilog-app-platform-',
     );
-    addTearDown(() => directory.delete(recursive: true));
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
     final file = File('${directory.path}${Platform.pathSeparator}cache.json');
     await file.writeAsString('{}');
 
@@ -158,7 +162,7 @@ void main() {
     expect(source, contains('ACTIVITY_NOT_FOUND'));
     expect(source, contains('SECURITY_ERROR'));
     expect(source, contains('PLATFORM_ERROR'));
-    expect(source, isNot(contains('cannot open \$uri')));
+    expect(source, isNot(contains(r'cannot open $uri')));
     expect(source, isNot(contains('e.message')));
     expect(source, isNot(contains('result.error("IO_ERROR", uri')));
   });
