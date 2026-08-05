@@ -1,0 +1,21 @@
+name: Diagnose incremental import contracts
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Inspect import and provenance source
+        run: |
+          echo '=== FILES ==='
+          find lib test -type f | sort | grep -E 'import|timeline|repository|database|analysis|summary|provenance'
+          echo '=== SYMBOLS ==='
+          grep -R -n -E 'sourceKey|fileHash|ImportedFile|insertNewRecords|latestCompletedImport|invalidateSummaries|runInTransaction|upsert|ImportDiff' lib test | head -n 1000 || true
