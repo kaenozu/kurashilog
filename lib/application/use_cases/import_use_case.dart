@@ -185,6 +185,15 @@ class ImportUseCase {
       );
     }
 
+    final completed = await repository.completedImportByHash(fileHash);
+    if (completed != null) {
+      return ImportResult(
+        ok: true,
+        sourceMinAt: completed.sourceMinAt,
+        sourceMaxAt: completed.sourceMaxAt,
+      );
+    }
+
     final startedAt = DateTime.now();
     final int importId;
     try {
@@ -256,10 +265,12 @@ class ImportUseCase {
           throw const ImportParseException('IMP-005', 'キャンセルされました');
         }
 
-        onProgress?.call(
-          const ImportProgress(ImportStage.clustering, percent: 75),
-        );
-        await analysis.rebuildAll();
+        if (addedVisits > 0 || addedMovements > 0) {
+          onProgress?.call(
+            const ImportProgress(ImportStage.clustering, percent: 75),
+          );
+          await analysis.rebuildAll();
+        }
 
         if (cancellation.isCancelled) {
           throw const ImportParseException('IMP-005', 'キャンセルされました');

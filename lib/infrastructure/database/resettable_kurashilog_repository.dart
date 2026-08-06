@@ -48,6 +48,10 @@ class ResettableKurashilogRepository implements KurashilogRepository {
       _run((repository) => repository.latestCompletedImport());
 
   @override
+  Future<ImportedFileRecord?> completedImportByHash(String fileHash) =>
+      _run((repository) => repository.completedImportByHash(fileHash));
+
+  @override
   Future<int> insertImport(ImportedFileRecord record) =>
       _run((repository) => repository.insertImport(record));
 
