@@ -11,6 +11,32 @@ enum InsightSeverity {
   final String label;
 }
 
+/// 画面上で同じ役割のカードを重複させないための分類。
+enum InsightKind {
+  coverage,
+  topPlace,
+  changedMetric,
+  lapsedPlace,
+  newPlace,
+  routine,
+}
+
+/// 表示文が事実か、弱い推定か、ユーザー確認済みかを区別する。
+enum InsightEvidenceLevel { fact, weakInference, userConfirmed }
+
+/// privateな値そのものではなく、安定した参照だけを保持する根拠。
+class InsightEvidence {
+  const InsightEvidence({
+    required this.type,
+    required this.reference,
+    this.level = InsightEvidenceLevel.fact,
+  });
+
+  final String type;
+  final String reference;
+  final InsightEvidenceLevel level;
+}
+
 /// 1 件のインサイト表示データ。
 class InsightData {
   const InsightData({
@@ -19,7 +45,10 @@ class InsightData {
     required this.title,
     required this.body,
     required this.score,
-    this.metricJson = const {},
+    this.kind = InsightKind.changedMetric,
+    this.groupKey,
+    this.evidence = const <InsightEvidence>[],
+    this.metricJson = const <String, Object?>{},
   });
 
   final String ruleId;
@@ -29,9 +58,14 @@ class InsightData {
 
   /// 同じ意味のルールをグループ化し、高い 1 件だけ表示するためのスコア。
   final int score;
+  final InsightKind kind;
+  final String? groupKey;
+  final List<InsightEvidence> evidence;
 
   /// 永続化用（periodKey ごとの重複防止・再表示）。
   final Map<String, Object?> metricJson;
+
+  String get semanticGroup => groupKey ?? ruleId;
 }
 
 /// インサイト生成時のコンテキスト（集計済みの値のみを渡す）。
@@ -56,6 +90,8 @@ class InsightContext {
     required this.previousWeekdayReturnMinutes,
     required this.currentHolidayRadiusM,
     required this.previousHolidayRadiusM,
+    this.privateClusterIds = const <int>{},
+    this.excludedClusterIds = const <int>{},
   });
 
   final DataQuality quality;
@@ -82,6 +118,12 @@ class InsightContext {
 
   /// clusterId → 表示名（ユーザーラベルまたは地点名）。
   final Map<int, String> clusterNames;
+
+  /// 集計には利用しても、ランキングや文章へ名前を出さない地点。
+  final Set<int> privateClusterIds;
+
+  /// ユーザーが分析・ランキングから除外した地点。
+  final Set<int> excludedClusterIds;
 
   /// 平日の基準地点帰着時刻の中央値（分）。サンプル不足は null。
   final int? currentWeekdayReturnMinutes;
