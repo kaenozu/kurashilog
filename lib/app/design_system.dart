@@ -311,22 +311,22 @@ class JournalStatePanel extends StatelessWidget {
       ),
     };
 
-    return Semantics(
-      container: true,
-      liveRegion: liveRegion,
-      label: '$title。$message',
-      child: ExcludeSemantics(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: background,
-            borderRadius: BorderRadius.circular(KurashilogRadius.medium),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(KurashilogSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Row(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(KurashilogRadius.medium),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(KurashilogSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Semantics(
+              container: true,
+              liveRegion: liveRegion,
+              label: '$title。$message',
+              child: ExcludeSemantics(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Icon(icon, color: foreground),
@@ -350,13 +350,13 @@ class JournalStatePanel extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (action != null) ...<Widget>[
-                  const SizedBox(height: KurashilogSpacing.md),
-                  action!,
-                ],
-              ],
+              ),
             ),
-          ),
+            if (action != null) ...<Widget>[
+              const SizedBox(height: KurashilogSpacing.md),
+              action!,
+            ],
+          ],
         ),
       ),
     );
