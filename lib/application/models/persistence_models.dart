@@ -73,7 +73,7 @@ enum PlacePrivacyMode {
     if (legacyExcluded) return PlacePrivacyMode.exclude;
     return PlacePrivacyMode.values.firstWhere(
       (mode) => mode.name == value,
-      orElse: () => PlacePrivacyMode.visible,
+      orElse: () => PlacePrivacyMode.exclude,
     );
   }
 }
