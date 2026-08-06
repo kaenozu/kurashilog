@@ -8,6 +8,7 @@ import '../../infrastructure/parsers/schema_detector.dart';
 import '../../infrastructure/parsers/timeline_parser.dart';
 import '../../infrastructure/platform/app_platform.dart';
 import '../analysis/analysis_coordinator.dart';
+import '../import/import_reconciliation.dart';
 import '../models/persistence_models.dart';
 import '../repositories/kurashilog_repository.dart';
 
@@ -58,6 +59,10 @@ class ImportResult {
     this.warnings = const [],
     this.errorCode,
     this.errorMessage,
+    this.reconciliation = const ImportReconciliation(
+      kind: ImportReconciliationKind.noChanges,
+      requiresFullReconciliation: false,
+    ),
   });
 
   final bool ok;
@@ -68,6 +73,7 @@ class ImportResult {
   final List<ImportWarning> warnings;
   final String? errorCode;
   final String? errorMessage;
+  final ImportReconciliation reconciliation;
 }
 
 /// Merges preview and full-validation warnings without counting the same
@@ -194,6 +200,11 @@ class ImportUseCase {
       );
     }
 
+    // Capture the watermark before applying this import. It is used only for
+    // conservative classification; it does not authorize deletion or source
+    // correction, which remain explicit follow-up work for #22.
+    final previousLatestAt = await repository.latestActivityAt();
+
     final startedAt = DateTime.now();
     final int importId;
     try {
@@ -220,6 +231,8 @@ class ImportUseCase {
       DateTime? sourceMaxAt;
       var addedVisits = 0;
       var addedMovements = 0;
+      DateTime? addedMinAt;
+      DateTime? addedMaxAt;
 
       await repository.runInTransaction(() async {
         final records = parser.parse(file.openRead(), cancellation);
@@ -242,6 +255,17 @@ class ImportUseCase {
             addedMovements += diff.addedMovements;
 
             final batchMin = _minStart(batch.visits, batch.movements);
+            if (diff.addedVisits > 0 || diff.addedMovements > 0) {
+              if (batchMin != null &&
+                  (addedMinAt == null || batchMin.isBefore(addedMinAt!))) {
+                addedMinAt = batchMin;
+              }
+              final batchMax = _maxEnd(batch.visits, batch.movements);
+              if (batchMax != null &&
+                  (addedMaxAt == null || batchMax.isAfter(addedMaxAt!))) {
+                addedMaxAt = batchMax;
+              }
+            }
             if (batchMin != null &&
                 (sourceMinAt == null || batchMin.isBefore(sourceMinAt!))) {
               sourceMinAt = batchMin;
@@ -299,6 +323,12 @@ class ImportUseCase {
       onProgress?.call(
         const ImportProgress(ImportStage.insights, percent: 100),
       );
+      final reconciliation = classifyImportReconciliation(
+        previousLatestAt: previousLatestAt,
+        addedMinAt: addedMinAt,
+        addedMaxAt: addedMaxAt,
+        addedRecordCount: addedVisits + addedMovements,
+      );
       return ImportResult(
         ok: true,
         addedVisits: addedVisits,
@@ -306,6 +336,7 @@ class ImportUseCase {
         sourceMinAt: sourceMinAt,
         sourceMaxAt: sourceMaxAt,
         warnings: warnings,
+        reconciliation: reconciliation,
       );
     } on ImportParseException catch (error) {
       await _recordTerminalState(

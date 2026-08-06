@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/application/analysis/analysis_coordinator.dart';
+import 'package:kurashilog/application/import/import_reconciliation.dart';
 import 'package:kurashilog/application/models/persistence_models.dart';
 import 'package:kurashilog/application/use_cases/import_use_case.dart';
 import 'package:kurashilog/domain/models/normalized_record.dart';
@@ -61,6 +62,14 @@ void main() {
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
       expect(second.addedMovements, 0);
+      expect(
+        first.reconciliation.kind,
+        ImportReconciliationKind.appendOnly,
+      );
+      expect(
+        second.reconciliation.kind,
+        ImportReconciliationKind.noChanges,
+      );
       expect(minRangePreserved, isTrue);
       expect(maxRangePreserved, isTrue);
       expect(parser.parseCount, 1);
@@ -83,11 +92,38 @@ void main() {
       expect(first.ok, isTrue);
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
+      expect(
+        second.reconciliation.kind,
+        ImportReconciliationKind.noChanges,
+      );
       expect(parser.parseCount, 2);
       expect(analysis.rebuildCount, 1);
       expect(await repository.countVisits(), 1);
     },
   );
+
+  test('new records inside existing history are classified as overlap', () async {
+    final file1 = File('${directory.path}/append.json');
+    final file2 = File('${directory.path}/overlap.json');
+    await file1.writeAsString('{}');
+    await file2.writeAsString('{"second":true}');
+    final sequencedUseCase = ImportUseCase(
+      repository: repository,
+      platform: AppPlatform(),
+      analysis: analysis,
+      parser: parser,
+      validator: _SequencedRecordValidator(),
+    );
+
+    final first = await sequencedUseCase.importFile(file1.path);
+    final second = await sequencedUseCase.importFile(file2.path);
+
+    expect(first.reconciliation.kind, ImportReconciliationKind.appendOnly);
+    expect(second.addedVisits, 1);
+    expect(second.reconciliation.kind, ImportReconciliationKind.overlap);
+    expect(second.reconciliation.requiresFullReconciliation, isTrue);
+    expect(analysis.rebuildCount, 2);
+  });
 }
 
 class _CountingAnalysis extends AnalysisCoordinator {
@@ -143,6 +179,38 @@ class _SameRecordValidator extends RecordValidator {
         StoredVisit(
           id: 0,
           sourceKey: 'stable-source-key',
+          startAtUtc: start,
+          endAtUtc: start.add(const Duration(hours: 1)),
+          latE7: 350000000,
+          lngE7: 1390000000,
+        ),
+      ],
+      movements: const <StoredMovement>[],
+      warnings: const <ImportWarning>[],
+      processedRecords: 1,
+      isFinal: true,
+    );
+  }
+}
+
+class _SequencedRecordValidator extends RecordValidator {
+  int callCount = 0;
+
+  @override
+  Stream<ValidationBatch> validateBatches(
+    Stream<NormalizedRecord> records,
+    CancellationToken token, {
+    int batchSize = 500,
+  }) async* {
+    final sequence = callCount++;
+    final start = sequence == 0
+        ? DateTime.utc(2026, 1, 10, 8)
+        : DateTime.utc(2026, 1, 9, 8);
+    yield ValidationBatch(
+      visits: <StoredVisit>[
+        StoredVisit(
+          id: 0,
+          sourceKey: 'sequenced-source-key-$sequence',
           startAtUtc: start,
           endAtUtc: start.add(const Duration(hours: 1)),
           latE7: 350000000,
