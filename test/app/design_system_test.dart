@@ -93,6 +93,39 @@ void main() {
     }
   });
 
+  testWidgets('state action keeps independent button semantics and tap', (
+    tester,
+  ) async {
+    var tapped = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: KurashilogTheme.light(),
+        home: Scaffold(
+          body: JournalStatePanel(
+            tone: JournalStateTone.error,
+            title: '読み込みに失敗しました',
+            message: '時間をおいて再試行してください',
+            action: FilledButton(
+              onPressed: () => tapped = true,
+              child: const Text('再試行'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.bySemanticsLabel('読み込みに失敗しました。時間をおいて再試行してください'),
+      findsOneWidget,
+    );
+    expect(find.bySemanticsLabel('再試行'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, '再試行'));
+    await tester.pump();
+    expect(tapped, isTrue);
+  });
+
   testWidgets('360px at 200 percent text remains scrollable and usable', (
     tester,
   ) async {
@@ -124,6 +157,16 @@ void main() {
                     child: const Text('根拠を見る'),
                   ),
                 ),
+                const SizedBox(height: KurashilogSpacing.lg),
+                JournalStatePanel(
+                  tone: JournalStateTone.error,
+                  title: '読み込みに失敗しました',
+                  message: '説明を省略せずに表示し、操作を残します',
+                  action: FilledButton(
+                    onPressed: () {},
+                    child: const Text('もう一度試す'),
+                  ),
+                ),
               ],
             ),
           ),
@@ -135,6 +178,16 @@ void main() {
     expect(find.text('根拠を見る'), findsOneWidget);
     final size = tester.getSize(find.widgetWithText(FilledButton, '根拠を見る'));
     expect(size.height, greaterThanOrEqualTo(48));
+
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, 'もう一度試す'),
+      200,
+    );
+    final actionSize = tester.getSize(
+      find.widgetWithText(FilledButton, 'もう一度試す'),
+    );
+    expect(actionSize.height, greaterThanOrEqualTo(48));
+    expect(find.bySemanticsLabel('もう一度試す'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
