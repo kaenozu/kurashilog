@@ -2,8 +2,12 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
+/// Androidが開いた公開設定画面。
+enum LocationSettingsDestination { locationSources, generalSettings }
+
 /// ネイティブ（Android）との橋渡し（設計書 M10 PlatformBridge）。
 ///
+/// - 公開Intentによる位置情報設定表示
 /// - SAF による JSON 選択（FR-010）
 /// - ACTION_SEND 共有受信（FR-011）
 /// - content:// URI の一時キャッシュへのコピー
@@ -15,6 +19,24 @@ class AppPlatform {
     : _channel = channel ?? const MethodChannel('kurashilog/platform');
 
   final MethodChannel _channel;
+
+  /// Androidの公開Intentで位置情報設定を開く。
+  ///
+  /// 位置情報設定を直接開けない端末では、Androidの一般設定へfallbackする。
+  /// どちらも起動できない場合、Android側は構造化されたPlatformExceptionを返す。
+  Future<LocationSettingsDestination> openLocationSettings() async {
+    final destination = await _channel.invokeMethod<String>(
+      'openLocationSettings',
+    );
+    return switch (destination) {
+      'locationSources' => LocationSettingsDestination.locationSources,
+      'generalSettings' => LocationSettingsDestination.generalSettings,
+      _ => throw PlatformException(
+        code: 'INVALID_RESPONSE',
+        message: '設定画面の起動結果を確認できませんでした',
+      ),
+    };
+  }
 
   /// SAF で JSON を選択し、一時キャッシュへのパスを返す。キャンセルは null。
   Future<String?> pickJsonFile() async {
