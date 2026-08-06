@@ -62,14 +62,8 @@ void main() {
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
       expect(second.addedMovements, 0);
-      expect(
-        first.reconciliation.kind,
-        ImportReconciliationKind.appendOnly,
-      );
-      expect(
-        second.reconciliation.kind,
-        ImportReconciliationKind.noChanges,
-      );
+      expect(first.reconciliation.kind, ImportReconciliationKind.appendOnly);
+      expect(second.reconciliation.kind, ImportReconciliationKind.noChanges);
       expect(minRangePreserved, isTrue);
       expect(maxRangePreserved, isTrue);
       expect(parser.parseCount, 1);
@@ -92,38 +86,38 @@ void main() {
       expect(first.ok, isTrue);
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
-      expect(
-        second.reconciliation.kind,
-        ImportReconciliationKind.noChanges,
-      );
+      expect(second.reconciliation.kind, ImportReconciliationKind.noChanges);
       expect(parser.parseCount, 2);
       expect(analysis.rebuildCount, 1);
       expect(await repository.countVisits(), 1);
     },
   );
 
-  test('new records inside existing history are classified as overlap', () async {
-    final file1 = File('${directory.path}/append.json');
-    final file2 = File('${directory.path}/overlap.json');
-    await file1.writeAsString('{}');
-    await file2.writeAsString('{"second":true}');
-    final sequencedUseCase = ImportUseCase(
-      repository: repository,
-      platform: AppPlatform(),
-      analysis: analysis,
-      parser: parser,
-      validator: _SequencedRecordValidator(),
-    );
+  test(
+    'new records inside existing history are classified as overlap',
+    () async {
+      final file1 = File('${directory.path}/append.json');
+      final file2 = File('${directory.path}/overlap.json');
+      await file1.writeAsString('{}');
+      await file2.writeAsString('{"second":true}');
+      final sequencedUseCase = ImportUseCase(
+        repository: repository,
+        platform: AppPlatform(),
+        analysis: analysis,
+        parser: parser,
+        validator: _SequencedRecordValidator(),
+      );
 
-    final first = await sequencedUseCase.importFile(file1.path);
-    final second = await sequencedUseCase.importFile(file2.path);
+      final first = await sequencedUseCase.importFile(file1.path);
+      final second = await sequencedUseCase.importFile(file2.path);
 
-    expect(first.reconciliation.kind, ImportReconciliationKind.appendOnly);
-    expect(second.addedVisits, 1);
-    expect(second.reconciliation.kind, ImportReconciliationKind.overlap);
-    expect(second.reconciliation.requiresFullReconciliation, isTrue);
-    expect(analysis.rebuildCount, 2);
-  });
+      expect(first.reconciliation.kind, ImportReconciliationKind.appendOnly);
+      expect(second.addedVisits, 1);
+      expect(second.reconciliation.kind, ImportReconciliationKind.overlap);
+      expect(second.reconciliation.requiresFullReconciliation, isTrue);
+      expect(analysis.rebuildCount, 2);
+    },
+  );
 }
 
 class _CountingAnalysis extends AnalysisCoordinator {
