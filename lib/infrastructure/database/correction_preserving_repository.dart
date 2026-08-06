@@ -19,7 +19,13 @@ class CorrectionPreservingRepository extends KurashilogRepositoryImpl {
     for (final cluster in rebuilt) {
       final correction = matches[cluster.stableKey];
       await updateClusterLabel(cluster.id, correction?.labelId);
-      await setClusterExcluded(cluster.id, correction?.excluded ?? false);
+      await setClusterPrivacyMode(
+        cluster.id,
+        correction?.privacyMode ??
+            ((correction?.excluded ?? false)
+                ? PlacePrivacyMode.exclude
+                : PlacePrivacyMode.visible),
+      );
     }
   }
 

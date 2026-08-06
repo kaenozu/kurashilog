@@ -117,8 +117,16 @@ class PlacesUseCase {
   }
 
   /// 分析除外の切り替え（設計書 FR-071 / AC-07）。
-  Future<void> setExcluded(int clusterId, bool excluded) async {
-    await repository.setClusterExcluded(clusterId, excluded);
+  Future<void> setExcluded(int clusterId, bool excluded) => setPrivacyMode(
+    clusterId,
+    excluded ? PlacePrivacyMode.exclude : PlacePrivacyMode.visible,
+  );
+
+  Future<void> setPrivacyMode(
+    int clusterId,
+    PlacePrivacyMode privacyMode,
+  ) async {
+    await repository.setClusterPrivacyMode(clusterId, privacyMode);
     await analysis.rebuildSummariesAndInsights();
   }
 }

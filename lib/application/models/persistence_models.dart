@@ -63,6 +63,21 @@ class StoredMovement {
   final bool validDistance;
 }
 
+enum PlacePrivacyMode {
+  visible,
+  hideName,
+  blurMap,
+  exclude;
+
+  static PlacePrivacyMode parse(String value, {bool legacyExcluded = false}) {
+    if (legacyExcluded) return PlacePrivacyMode.exclude;
+    return PlacePrivacyMode.values.firstWhere(
+      (mode) => mode.name == value,
+      orElse: () => PlacePrivacyMode.exclude,
+    );
+  }
+}
+
 class StoredCluster {
   const StoredCluster({
     required this.id,
@@ -76,6 +91,7 @@ class StoredCluster {
     required this.lastAt,
     this.labelId,
     this.excluded = false,
+    this.privacyMode = PlacePrivacyMode.visible,
     this.labelName,
     this.category,
     this.isBasePlace = false,
@@ -91,10 +107,16 @@ class StoredCluster {
   final DateTime firstAt;
   final DateTime lastAt;
   final int? labelId;
+
+  /// Legacy analysis exclusion flag, kept for backward compatibility.
   final bool excluded;
+  final PlacePrivacyMode privacyMode;
   final String? labelName;
   final String? category;
   final bool isBasePlace;
+
+  bool get excludedFromAnalysis =>
+      excluded || privacyMode == PlacePrivacyMode.exclude;
 
   LatLngE7 get centroid => LatLngE7(centroidLatE7, centroidLngE7);
 

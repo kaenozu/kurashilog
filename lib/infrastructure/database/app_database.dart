@@ -42,12 +42,21 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (m) async {
       await m.createAll();
+    },
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(placeClusters, placeClusters.privacyMode);
+        await customStatement(
+          "UPDATE place_clusters SET privacy_mode = 'exclude' "
+          'WHERE excluded = 1',
+        );
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA journal_mode = wal;');

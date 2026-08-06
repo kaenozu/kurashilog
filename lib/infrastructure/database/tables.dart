@@ -10,14 +10,12 @@ class TimelineImports extends Table {
   DateTimeColumn get completedAt => dateTime().nullable()();
   DateTimeColumn get sourceMinAt => dateTime().nullable()();
   DateTimeColumn get sourceMaxAt => dateTime().nullable()();
-  TextColumn get status =>
-      text()(); // processing | completed | failed | cancelled
+  TextColumn get status => text()();
   IntColumn get warningCount => integer().withDefault(const Constant(0))();
   IntColumn get addedVisits => integer().withDefault(const Constant(0))();
   IntColumn get addedMovements => integer().withDefault(const Constant(0))();
 }
 
-/// 訪問区間（設計書 4.1 visits）。
 @DataClassName('VisitRow')
 @TableIndex(name: 'visits_start_idx', columns: {#startAtUtc})
 @TableIndex(name: 'visits_cluster_idx', columns: {#clusterId, #startAtUtc})
@@ -34,7 +32,6 @@ class Visits extends Table {
   RealColumn get confidence => real().nullable()();
 }
 
-/// 移動区間（設計書 4.1 movements）。
 @DataClassName('MovementRow')
 @TableIndex(name: 'movements_start_idx', columns: {#startAtUtc})
 class Movements extends Table {
@@ -50,15 +47,10 @@ class Movements extends Table {
   TextColumn get distanceMethod => text()();
   TextColumn get activityType => text().nullable()();
   RealColumn get confidence => real().nullable()();
-
-  /// 経路点列（"lat,lng;lat,lng" 形式）。距離の推定に使う。
   TextColumn get pathJson => text().nullable()();
-
-  /// 日常移動集計から除外するか（異常速度など）。
   BoolColumn get validDistance => boolean().withDefault(const Constant(true))();
 }
 
-/// 頻出地点クラスタ（設計書 4.1 place_clusters）。
 @DataClassName('PlaceClusterRow')
 @TableIndex(name: 'clusters_stable_idx', columns: {#stableKey})
 @TableIndex(name: 'clusters_last_idx', columns: {#lastAt})
@@ -73,10 +65,14 @@ class PlaceClusters extends Table {
   DateTimeColumn get firstAt => dateTime()();
   DateTimeColumn get lastAt => dateTime()();
   IntColumn get labelId => integer().nullable()();
+
+  /// Legacy compatibility. New code synchronizes this with privacyMode=exclude.
   BoolColumn get excluded => boolean().withDefault(const Constant(false))();
+
+  /// visible | hideName | blurMap | exclude
+  TextColumn get privacyMode => text().withDefault(const Constant('visible'))();
 }
 
-/// ユーザーラベル（設計書 4.1 place_labels）。
 @DataClassName('PlaceLabelRow')
 class PlaceLabels extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -87,10 +83,9 @@ class PlaceLabels extends Table {
   DateTimeColumn get updatedAt => dateTime()();
 }
 
-/// 日次集計キャッシュ（設計書 4.1 daily_summaries）。
 @DataClassName('DailySummaryRow')
 class DailySummaries extends Table {
-  TextColumn get localDate => text()(); // YYYY-MM-DD
+  TextColumn get localDate => text()();
   BoolColumn get outingFlag => boolean()();
   IntColumn get visitCount => integer()();
   IntColumn get clusterCount => integer()();
@@ -104,25 +99,21 @@ class DailySummaries extends Table {
   Set<Column> get primaryKey => {localDate};
 }
 
-/// 月次集計キャッシュ（設計書 4.1 monthly_summaries）。
 @DataClassName('MonthlySummaryRow')
 class MonthlySummaries extends Table {
-  TextColumn get yearMonth => text()(); // YYYY-MM
+  TextColumn get yearMonth => text()();
   IntColumn get outingDays => integer()();
   IntColumn get distanceM => integer()();
   IntColumn get uniqueClusters => integer()();
   IntColumn get newClusters => integer()();
   TextColumn get maxDistanceDate => text().nullable()();
   DateTimeColumn get calculatedAt => dateTime()();
-
-  /// 当月に訪問のあったクラスタ ID 一覧（前月比の新規地点算出用）。
   TextColumn get clusterIdsJson => text().withDefault(const Constant(''))();
 
   @override
   Set<Column> get primaryKey => {yearMonth};
 }
 
-/// 表示用インサイト（設計書 4.1 insights）。
 @DataClassName('InsightRow')
 @TableIndex(name: 'insights_period_idx', columns: {#periodKey, #ruleId})
 class Insights extends Table {
@@ -142,7 +133,6 @@ class Insights extends Table {
   ];
 }
 
-/// アプリ設定（設計書 4.1 app_settings）。
 @DataClassName('AppSettingRow')
 class AppSettings extends Table {
   TextColumn get key => text()();
