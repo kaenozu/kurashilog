@@ -9,8 +9,7 @@ void main() {
       'kurashilog-privacy-migration-',
     );
     addTearDown(() => directory.delete(recursive: true));
-    final path =
-        '${directory.path}${Platform.pathSeparator}kurashilog.sqlite';
+    final path = '${directory.path}${Platform.pathSeparator}kurashilog.sqlite';
 
     final seed = await AppDatabase.openAtPath(path);
     await seed.customStatement('DROP TABLE place_clusters');
