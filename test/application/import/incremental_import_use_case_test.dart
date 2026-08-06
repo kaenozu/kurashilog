@@ -49,20 +49,20 @@ void main() {
 
       final first = await useCase.importFile(file.path);
       final second = await useCase.importFile(file.path);
+      final minRangePreserved = second.sourceMinAt!.isAtSameMomentAs(
+        first.sourceMinAt!,
+      );
+      final maxRangePreserved = second.sourceMaxAt!.isAtSameMomentAs(
+        first.sourceMaxAt!,
+      );
 
       expect(first.ok, isTrue);
       expect(first.addedVisits, 1);
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
       expect(second.addedMovements, 0);
-      expect(
-        second.sourceMinAt!.isAtSameMomentAs(first.sourceMinAt!),
-        isTrue,
-      );
-      expect(
-        second.sourceMaxAt!.isAtSameMomentAs(first.sourceMaxAt!),
-        isTrue,
-      );
+      expect(minRangePreserved, isTrue);
+      expect(maxRangePreserved, isTrue);
       expect(parser.parseCount, 1);
       expect(analysis.rebuildCount, 1);
       expect(await repository.countVisits(), 1);
