@@ -55,6 +55,8 @@ void main() {
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
       expect(second.addedMovements, 0);
+      expect(second.sourceMinAt, first.sourceMinAt);
+      expect(second.sourceMaxAt, first.sourceMaxAt);
       expect(parser.parseCount, 1);
       expect(analysis.rebuildCount, 1);
       expect(await repository.countVisits(), 1);
