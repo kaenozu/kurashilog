@@ -61,12 +61,19 @@ void main() {
     expect(encoded, isNot(contains('1397671234')));
   });
 
-  test('legacy excluded value maps to explicit exclude mode', () {
+  test('legacy and unknown persisted values fail closed', () {
     expect(
       PlacePrivacyMode.parse('visible', legacyExcluded: true),
       PlacePrivacyMode.exclude,
     );
-    expect(PlacePrivacyMode.parse('unknown'), PlacePrivacyMode.visible);
+
+    final unknownMode = PlacePrivacyMode.parse('future-private-mode');
+    expect(unknownMode, PlacePrivacyMode.exclude);
+
+    final cluster = sample(privacyMode: unknownMode);
+    expect(cluster.excludedFromAnalysis, isTrue);
+    expect(projector.forApp(cluster), isNull);
+    expect(projector.forSharing(cluster), isNull);
   });
 }
 
