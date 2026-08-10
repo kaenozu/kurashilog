@@ -162,9 +162,9 @@ class _PreviewBody extends StatelessWidget {
       if (existingLatestAt == null) {
         unreportedLabel = '全期間（初回の取り込み）';
       } else if (preview.maxAt!.isAfter(existingLatestAt!)) {
-        final days = _localDateOnly(preview.maxAt!)
-            .difference(_localDateOnly(existingLatestAt!))
-            .inDays;
+        final days = _localDateOnly(
+          preview.maxAt!,
+        ).difference(_localDateOnly(existingLatestAt!)).inDays;
         unreportedLabel = days > 0
             ? '$days 日分（${fmt.format(existingLatestAt!.toLocal())} より後）'
             : '0 日';
@@ -435,5 +435,7 @@ class _ErrorBody extends StatelessWidget {
 }
 
 /// 未反映期間の算出に使う、ローカル日付のみの正規化。
-DateTime _localDateOnly(DateTime value) =>
-    DateTime(value.year, value.month, value.day);
+DateTime _localDateOnly(DateTime value) {
+  final local = value.toLocal();
+  return DateTime(local.year, local.month, local.day);
+}
