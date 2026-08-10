@@ -10,6 +10,7 @@ import 'analysis/analysis_coordinator.dart';
 import 'repositories/kurashilog_repository.dart';
 import 'use_cases/dashboard_use_case.dart';
 import 'use_cases/data_management_use_case.dart';
+import 'use_cases/comparison_use_case.dart';
 import 'use_cases/import_use_case.dart';
 import 'use_cases/places_use_case.dart';
 import 'use_cases/settings_use_case.dart';
@@ -52,6 +53,10 @@ final placesUseCaseProvider = Provider<PlacesUseCase>(
     repository: ref.watch(repositoryProvider),
     analysis: ref.watch(analysisCoordinatorProvider),
   ),
+);
+
+final comparisonUseCaseProvider = Provider<ComparisonUseCase>(
+  (ref) => ComparisonUseCase(repository: ref.watch(repositoryProvider)),
 );
 
 final settingsUseCaseProvider = Provider<SettingsUseCase>(
