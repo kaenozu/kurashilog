@@ -108,7 +108,9 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
       return;
     }
     // AC6: 未反映期間の表示に使う、取込前の既存データ最新記録日を取得する。
-    final existingLatestAt = await ref.read(repositoryProvider).latestActivityAt();
+    final existingLatestAt = await ref
+        .read(repositoryProvider)
+        .latestActivityAt();
     if (!identical(_token, token)) return;
     state = ImportFlowState(
       phase: ImportPhase.previewReady,
