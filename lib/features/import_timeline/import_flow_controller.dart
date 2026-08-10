@@ -17,6 +17,7 @@ class ImportFlowState {
     this.result,
     this.errorCode,
     this.errorMessage,
+    this.existingLatestAt,
   });
 
   final ImportPhase phase;
@@ -26,6 +27,9 @@ class ImportFlowState {
   final ImportResult? result;
   final String? errorCode;
   final String? errorMessage;
+
+  /// 取込前の既存データ最新記録日（未反映期間の算出に使用）。
+  final DateTime? existingLatestAt;
 
   static const idle = ImportFlowState(phase: ImportPhase.idle);
 
@@ -37,7 +41,9 @@ class ImportFlowState {
     ImportResult? result,
     String? errorCode,
     String? errorMessage,
+    DateTime? existingLatestAt,
     bool clearPath = false,
+    bool clearExistingLatestAt = false,
   }) => ImportFlowState(
     phase: phase ?? this.phase,
     cachePath: clearPath ? null : (cachePath ?? this.cachePath),
@@ -46,6 +52,9 @@ class ImportFlowState {
     result: result ?? this.result,
     errorCode: errorCode ?? this.errorCode,
     errorMessage: errorMessage ?? this.errorMessage,
+    existingLatestAt: clearExistingLatestAt
+        ? null
+        : (existingLatestAt ?? this.existingLatestAt),
   );
 }
 
@@ -98,10 +107,14 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
       );
       return;
     }
+    // AC6: 未反映期間の表示に使う、取込前の既存データ最新記録日を取得する。
+    final existingLatestAt = await ref.read(repositoryProvider).latestActivityAt();
+    if (!identical(_token, token)) return;
     state = ImportFlowState(
       phase: ImportPhase.previewReady,
       cachePath: cachePath,
       preview: result,
+      existingLatestAt: existingLatestAt,
     );
   }
 
