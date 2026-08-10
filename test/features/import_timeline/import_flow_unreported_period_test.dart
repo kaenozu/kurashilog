@@ -47,7 +47,6 @@ void main() {
         analysis: analysis,
       );
 
-      // 初回取込（この時点では未反映期間なし）。
       final firstPreview = await useCase.previewFile(source.path);
       final firstImport = await useCase.importFile(
         source.path,
@@ -57,7 +56,6 @@ void main() {
       final latestAfterFirst = await repository.latestActivityAt();
       expect(latestAfterFirst, isNotNull);
 
-      // 同じファイルを再プレビュー → 既存最新日が state に保持される。
       final container = ProviderContainer(
         overrides: <Override>[
           repositoryProvider.overrideWithValue(repository),
@@ -77,87 +75,66 @@ void main() {
     },
   );
 
-  testWidgets(
-    'first import shows the whole period as new',
-    (tester) async {
-      await _pumpPreview(
-        tester,
-        existingLatestAt: null,
-        maxAt: DateTime(2026, 8, 10, 20),
-      );
+  testWidgets('first import display', _firstImportDisplay);
+  testWidgets('equal latest hides row', _equalLatestHidesRow);
+  testWidgets('newer existing hides row', _newerExistingHidesRow);
+  testWidgets('same-day new data shows zero days', _sameDayShowsZeroDays);
+  testWidgets('later dates show day difference', _laterDatesShowDifference);
+  testWidgets('missing max hides row', _missingMaxHidesRow);
+}
 
-      expect(find.text('未反映期間'), findsOneWidget);
-      expect(find.text('全期間（初回の取り込み）'), findsOneWidget);
-    },
+Future<void> _firstImportDisplay(WidgetTester tester) async {
+  await _pumpPreview(
+    tester,
+    existingLatestAt: null,
+    maxAt: DateTime(2026, 8, 10, 20),
   );
+  expect(find.text('未反映期間'), findsOneWidget);
+  expect(find.text('全期間（初回の取り込み）'), findsOneWidget);
+}
 
-  testWidgets(
-    'equal latest timestamp hides the unreported-period row',
-    (tester) async {
-      final latest = DateTime(2026, 8, 10, 12);
-      await _pumpPreview(
-        tester,
-        existingLatestAt: latest,
-        maxAt: latest,
-      );
+Future<void> _equalLatestHidesRow(WidgetTester tester) async {
+  final latest = DateTime(2026, 8, 10, 12);
+  await _pumpPreview(tester, existingLatestAt: latest, maxAt: latest);
+  expect(find.text('未反映期間'), findsNothing);
+}
 
-      expect(find.text('未反映期間'), findsNothing);
-    },
+Future<void> _newerExistingHidesRow(WidgetTester tester) async {
+  await _pumpPreview(
+    tester,
+    existingLatestAt: DateTime(2026, 8, 11),
+    maxAt: DateTime(2026, 8, 10),
   );
+  expect(find.text('未反映期間'), findsNothing);
+}
 
-  testWidgets(
-    'newer existing data hides the unreported-period row',
-    (tester) async {
-      await _pumpPreview(
-        tester,
-        existingLatestAt: DateTime(2026, 8, 11),
-        maxAt: DateTime(2026, 8, 10),
-      );
-
-      expect(find.text('未反映期間'), findsNothing);
-    },
+Future<void> _sameDayShowsZeroDays(WidgetTester tester) async {
+  await _pumpPreview(
+    tester,
+    existingLatestAt: DateTime(2026, 8, 10, 8),
+    maxAt: DateTime(2026, 8, 10, 20),
   );
+  expect(find.text('未反映期間'), findsOneWidget);
+  expect(find.text('0 日'), findsOneWidget);
+}
 
-  testWidgets(
-    'same-day new data is reported as zero days',
-    (tester) async {
-      await _pumpPreview(
-        tester,
-        existingLatestAt: DateTime(2026, 8, 10, 8),
-        maxAt: DateTime(2026, 8, 10, 20),
-      );
-
-      expect(find.text('未反映期間'), findsOneWidget);
-      expect(find.text('0 日'), findsOneWidget);
-    },
+Future<void> _laterDatesShowDifference(WidgetTester tester) async {
+  await _pumpPreview(
+    tester,
+    existingLatestAt: DateTime(2026, 8, 8, 23),
+    maxAt: DateTime(2026, 8, 10, 1),
   );
+  expect(find.text('未反映期間'), findsOneWidget);
+  expect(find.text('2 日分（2026年8月8日 より後）'), findsOneWidget);
+}
 
-  testWidgets(
-    'later local dates show the day difference',
-    (tester) async {
-      await _pumpPreview(
-        tester,
-        existingLatestAt: DateTime(2026, 8, 8, 23),
-        maxAt: DateTime(2026, 8, 10, 1),
-      );
-
-      expect(find.text('未反映期間'), findsOneWidget);
-      expect(find.text('2 日分（2026年8月8日 より後）'), findsOneWidget);
-    },
+Future<void> _missingMaxHidesRow(WidgetTester tester) async {
+  await _pumpPreview(
+    tester,
+    existingLatestAt: DateTime(2026, 8, 8),
+    maxAt: null,
   );
-
-  testWidgets(
-    'missing preview max timestamp hides the unreported-period row',
-    (tester) async {
-      await _pumpPreview(
-        tester,
-        existingLatestAt: DateTime(2026, 8, 8),
-        maxAt: null,
-      );
-
-      expect(find.text('未反映期間'), findsNothing);
-    },
-  );
+  expect(find.text('未反映期間'), findsNothing);
 }
 
 Future<void> _pumpPreview(
