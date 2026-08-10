@@ -3,13 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/providers.dart';
 import '../features/calendar/calendar_screen.dart';
+import '../features/comparison/comparison_screen.dart';
 import '../features/dashboard/home_screen.dart';
 import '../features/places/places_screen.dart';
 import '../features/settings/settings_screen.dart';
 
 /// メインシェル（設計書 7.1 ナビゲーション）。
 ///
-/// ホーム / カレンダー / 地点 / 設定 の 4 タブ。
+/// ホーム / カレンダー / 比較 / 地点 / 設定 の 5 タブ。
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -20,6 +21,7 @@ class MainShell extends ConsumerWidget {
     final screens = [
       const HomeScreen(),
       const CalendarScreen(),
+      const ComparisonScreen(),
       const PlacesScreen(),
       const SettingsScreen(),
     ];
@@ -40,6 +42,11 @@ class MainShell extends ConsumerWidget {
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'カレンダー',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.compare_arrows_outlined),
+            selectedIcon: Icon(Icons.compare_arrows),
+            label: '比較',
           ),
           NavigationDestination(
             icon: Icon(Icons.place_outlined),
