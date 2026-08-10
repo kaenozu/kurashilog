@@ -78,7 +78,11 @@ void main() {
   );
 
   testWidgets('first import shows the whole period as new', (tester) async {
-    await _pumpPreview(tester, existingLatestAt: null);
+    await _pumpPreview(
+      tester,
+      existingLatestAt: null,
+      maxAt: DateTime(2026, 8, 10, 20),
+    );
 
     expect(find.text('未反映期間'), findsOneWidget);
     expect(find.text('全期間（初回の取り込み）'), findsOneWidget);
@@ -147,17 +151,14 @@ void main() {
 Future<void> _pumpPreview(
   WidgetTester tester, {
   required DateTime? existingLatestAt,
-  DateTime? maxAt = const _DefaultPreviewMaxAt(),
+  required DateTime? maxAt,
 }) async {
-  final resolvedMaxAt = maxAt is _DefaultPreviewMaxAt
-      ? DateTime(2026, 8, 10, 20)
-      : maxAt;
   final preview = ImportPreview(
     ok: true,
     fileHash: 'hash',
     schemaType: 'records',
     minAt: DateTime(2026, 8, 1),
-    maxAt: resolvedMaxAt,
+    maxAt: maxAt,
     recordCount: 10,
   );
   final state = ImportFlowState(
@@ -184,8 +185,4 @@ class _PreviewStateNotifier extends ImportFlowNotifier {
 
   @override
   ImportFlowState build() => initialState;
-}
-
-class _DefaultPreviewMaxAt extends DateTime {
-  const _DefaultPreviewMaxAt() : super.fromMillisecondsSinceEpoch(0);
 }
