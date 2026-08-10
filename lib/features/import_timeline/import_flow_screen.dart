@@ -37,6 +37,7 @@ class ImportFlowScreen extends ConsumerWidget {
           ImportPhase.previewing => const _LoadingBody(label: 'ファイルを確認しています…'),
           ImportPhase.previewReady => _PreviewBody(
             preview: state.preview!,
+            existingLatestAt: state.existingLatestAt,
             onCancel: () => ref.read(importFlowProvider.notifier).dismiss(),
             onImport: () => ref.read(importFlowProvider.notifier).startImport(),
           ),
@@ -138,11 +139,13 @@ class _PreviewBody extends StatelessWidget {
     required this.preview,
     required this.onCancel,
     required this.onImport,
+    this.existingLatestAt,
   });
 
   final ImportPreview preview;
   final VoidCallback onCancel;
   final VoidCallback onImport;
+  final DateTime? existingLatestAt;
 
   @override
   Widget build(BuildContext context) {
@@ -151,6 +154,22 @@ class _PreviewBody extends StatelessWidget {
     final period = preview.minAt != null && preview.maxAt != null
         ? '${fmt.format(preview.minAt!.toLocal())} 〜 ${fmt.format(preview.maxAt!.toLocal())}'
         : '不明';
+
+    // AC6: 既存データの最新記録日とファイル終端の差 = 未反映期間。
+    // 既存データが無い（初回取込）場合は「全期間が新規」と表示する。
+    String? unreportedLabel;
+    if (preview.maxAt != null) {
+      if (existingLatestAt == null) {
+        unreportedLabel = '全期間（初回の取り込み）';
+      } else if (preview.maxAt!.isAfter(existingLatestAt!)) {
+        final days = _localDateOnly(
+          preview.maxAt!,
+        ).difference(_localDateOnly(existingLatestAt!)).inDays;
+        unreportedLabel = days > 0
+            ? '$days 日分（${fmt.format(existingLatestAt!.toLocal())} より後）'
+            : '0 日';
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.all(20),
@@ -165,6 +184,8 @@ class _PreviewBody extends StatelessWidget {
                 const SizedBox(height: 12),
                 _row(theme, '形式', 'タイムライン（Records.json）'),
                 _row(theme, '対象期間', period),
+                if (unreportedLabel != null)
+                  _row(theme, '未反映期間', unreportedLabel),
                 _row(theme, '概算レコード数', '${preview.recordCount} 件'),
                 _row(
                   theme,
@@ -411,4 +432,10 @@ class _ErrorBody extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 未反映期間の算出に使う、ローカル日付のみの正規化。
+DateTime _localDateOnly(DateTime value) {
+  final local = value.toLocal();
+  return DateTime(local.year, local.month, local.day);
 }
