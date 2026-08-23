@@ -54,9 +54,8 @@ class _RootGateState extends ConsumerState<_RootGate>
     if (state == AppLifecycleState.resumed) {
       _checkSharedFile();
     }
-    if (state == AppLifecycleState.detached) {
-      ref.read(appDatabaseHandleProvider).close();
-    }
+    // detached では DB を閉じない。Android の detached は必ずしも終了を
+    // 意味せず、再オープン経路がないため閉じると復帰時に壊れる。
   }
 
   Future<void> _checkSharedFile() async {
