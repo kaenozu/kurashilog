@@ -251,7 +251,7 @@ class AnalysisCoordinator {
           )
           .quality,
     );
-    final selected = insights.selectForMonthStory(context);
+    final selected = insights.selectForFirstReport(context);
     await repository.replaceInsightsForPeriod(
       window.periodKey,
       selected
@@ -263,7 +263,19 @@ class AnalysisCoordinator {
               severity: insight.severity.name,
               title: insight.title,
               body: insight.body,
-              metricJson: jsonEncode(insight.metricJson),
+              metricJson: jsonEncode(<String, Object?>{
+                ...insight.metricJson,
+                'kind': insight.kind.name,
+                'evidence': insight.evidence
+                    .map(
+                      (evidence) => <String, Object?>{
+                        'type': evidence.type,
+                        'reference': evidence.reference,
+                        'level': evidence.level.name,
+                      },
+                    )
+                    .toList(growable: false),
+              }),
               createdAt: DateTime.now(),
             ),
           )

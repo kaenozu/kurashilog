@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/application/analysis/analysis_coordinator.dart';
+import 'package:kurashilog/application/analysis/window.dart';
 import 'package:kurashilog/application/use_cases/import_use_case.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
 import 'package:kurashilog/infrastructure/database/kurashilog_repository_impl.dart';
@@ -78,6 +80,19 @@ void main() {
       expect(visits.every((visit) => visit.clusterId != null), isTrue);
       expect(await repository.allClusters(), isNotEmpty);
       expect(await repository.allMonthlySummaries(), isNotEmpty);
+
+      final latest = await repository.latestActivityAt();
+      expect(latest, isNotNull);
+      final firstReport = await repository.insightsForPeriod(
+        computeComparisonWindow(latest!.toLocal()).periodKey,
+      );
+      expect(firstReport.length, lessThanOrEqualTo(5));
+      expect(
+        firstReport.every(
+          (insight) => jsonDecode(insight.metricJson)['evidence'] is List,
+        ),
+        isTrue,
+      );
 
       final completed = await repository.latestCompletedImport();
       expect(completed, isNotNull);
