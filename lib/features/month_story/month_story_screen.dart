@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/design_system.dart';
 import '../../application/display_preferences.dart';
 import '../../application/providers.dart';
 import '../../application/use_cases/settings_use_case.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
-import '../../domain/models/insight.dart';
 import '../../shared/widgets.dart';
 
 /// 月間ストーリー（設計書 SC-05 / FR-050）。
@@ -100,43 +100,45 @@ class _StoryBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          monthLabel,
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+        const JournalSectionHeader(
+          eyebrow: '月間ストーリー',
+          title: 'この月の暮らし',
+          supportingText: '記録から見える事実と、前月からの変化',
+        ),
+        const SizedBox(height: KurashilogSpacing.md),
+        JournalCard(
+          kind: JournalCardKind.hero,
+          title: monthLabel,
+          subtitle: 'この月の生活のまとめです。',
+          semanticLabel: '月間ストーリー。$monthLabel',
+          child: Wrap(
+            spacing: KurashilogSpacing.sm,
+            runSpacing: KurashilogSpacing.sm,
+            children: [
+              _pill(
+                theme,
+                '外出日数',
+                '${monthly.outingDays}日',
+                _delta(prev?.outingDays, monthly.outingDays),
+              ),
+              _pill(
+                theme,
+                '移動距離',
+                formatDistance(monthly.distanceM, distanceUnit),
+                _deltaPercent(prev?.distanceM, monthly.distanceM),
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'この月の生活のまとめです。',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: KurashilogSpacing.md),
+        JournalSectionHeader(title: '小さな事実', supportingText: '訪れた場所と新しい場所'),
+        const SizedBox(height: KurashilogSpacing.sm),
         Wrap(
-          spacing: 12,
-          runSpacing: 12,
+          spacing: KurashilogSpacing.sm,
+          runSpacing: KurashilogSpacing.sm,
           children: [
-            _pill(
-              theme,
-              '外出日数',
-              '${monthly.outingDays}日',
-              _delta(prev?.outingDays, monthly.outingDays),
-            ),
-            _pill(
-              theme,
-              '移動距離',
-              formatDistance(monthly.distanceM, distanceUnit),
-              _deltaPercent(prev?.distanceM, monthly.distanceM),
-            ),
-            _pill(
-              theme,
-              '訪れた地点',
-              '${monthly.uniqueClusters}か所',
-              _delta(prev?.uniqueClusters, monthly.uniqueClusters),
-            ),
-            _pill(theme, '新規地点', '${monthly.newClusters}か所', null),
+            _miniFact(theme, '訪れた地点', '${monthly.uniqueClusters}か所'),
+            _miniFact(theme, '新規地点', '${monthly.newClusters}か所'),
           ],
         ),
         const SizedBox(height: 16),
@@ -182,9 +184,22 @@ class _StoryBody extends StatelessWidget {
         ],
         const SizedBox(height: 16),
         if (data.insights.isNotEmpty) ...[
-          Text('この月の変化', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          for (final insight in data.insights) _insightCard(theme, insight),
+          const JournalSectionHeader(
+            title: 'この月の変化',
+            supportingText: '根拠を確認して、解釈を自分で決められます',
+          ),
+          const SizedBox(height: KurashilogSpacing.sm),
+          for (final insight in data.insights)
+            Padding(
+              padding: const EdgeInsets.only(bottom: KurashilogSpacing.sm),
+              child: JournalCard(
+                kind: JournalCardKind.insight,
+                title: insight.title,
+                subtitle: insight.severity.label,
+                semanticLabel: '${insight.title}。${insight.body}',
+                child: Text(insight.body),
+              ),
+            ),
         ] else
           Card(
             child: Padding(
@@ -196,6 +211,15 @@ class _StoryBody extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _miniFact(ThemeData theme, String label, String value) {
+    return JournalCard(
+      kind: JournalCardKind.mini,
+      title: label,
+      semanticLabel: '$label $value',
+      child: Text(value, style: theme.textTheme.titleMedium),
     );
   }
 
@@ -230,22 +254,6 @@ class _StoryBody extends StatelessWidget {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _insightCard(ThemeData theme, InsightData insight) {
-    final scheme = theme.colorScheme;
-    final attention = insight.severity == InsightSeverity.attention;
-    return Card(
-      child: ListTile(
-        leading: Icon(
-          attention ? Icons.star : Icons.lightbulb_outline,
-          color: attention ? scheme.tertiary : scheme.primary,
-        ),
-        title: Text(insight.title, style: theme.textTheme.titleSmall),
-        subtitle: Text(insight.body),
-        isThreeLine: true,
       ),
     );
   }

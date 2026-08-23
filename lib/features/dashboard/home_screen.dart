@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/design_system.dart';
 import '../../application/providers.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
 import '../../domain/models/data_quality.dart';
-import '../../domain/models/insight.dart';
 import '../../domain/models/summaries.dart';
 import '../../shared/widgets.dart';
 import '../import_timeline/import_flow_screen.dart';
@@ -92,11 +92,10 @@ class _HomeBody extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            dashboard.monthLabel,
-            style: theme.textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+          JournalSectionHeader(
+            eyebrow: '生活記録誌',
+            title: dashboard.monthLabel,
+            supportingText: '記録から見える、今月の暮らし',
           ),
           if (freshness.quality == DataQuality.low ||
               freshness.quality == DataQuality.quiteLow ||
@@ -113,23 +112,41 @@ class _HomeBody extends ConsumerWidget {
             ),
           ],
           const SizedBox(height: 16),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.25,
-            children: [
-              for (final metric in dashboard.metrics)
-                MetricCard(
-                  icon: _iconFor(metric.icon),
-                  label: metric.label,
-                  value: metric.value,
-                  deltaLabel: metric.deltaLabel,
-                  note: metric.note,
-                ),
-            ],
+          if (dashboard.metrics.isNotEmpty)
+            JournalCard(
+              kind: JournalCardKind.hero,
+              title: '今月の暮らし',
+              subtitle: '集計された事実を、前月との違いと一緒に確認できます',
+              semanticLabel: '今月の暮らし。${dashboard.monthLabel}',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MetricCard(
+                    icon: _iconFor(dashboard.metrics.first.icon),
+                    label: dashboard.metrics.first.label,
+                    value: dashboard.metrics.first.value,
+                    deltaLabel: dashboard.metrics.first.deltaLabel,
+                    note: dashboard.metrics.first.note,
+                  ),
+                  if (dashboard.metrics.length > 1) ...[
+                    const SizedBox(height: KurashilogSpacing.md),
+                    Wrap(
+                      spacing: KurashilogSpacing.sm,
+                      runSpacing: KurashilogSpacing.sm,
+                      children: [
+                        for (final metric in dashboard.metrics.skip(1))
+                          _MiniMetric(metric: metric),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          if (dashboard.metrics.isNotEmpty)
+            const SizedBox(height: KurashilogSpacing.lg),
+          const JournalSectionHeader(
+            title: '小さな事実',
+            supportingText: '数字の意味を、読みやすい単位でまとめています',
           ),
           const SizedBox(height: 16),
           Card(
@@ -146,13 +163,22 @@ class _HomeBody extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           if (dashboard.insights.isNotEmpty) ...[
-            Text('気づき', style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
+            const SizedBox(height: KurashilogSpacing.md),
+            const JournalSectionHeader(
+              title: '気づき',
+              supportingText: '変化の根拠を確認して、解釈を自分で決められます',
+            ),
+            const SizedBox(height: KurashilogSpacing.sm),
             for (final insight in dashboard.insights)
-              _InsightCard(
-                title: insight.title,
-                body: insight.body,
-                attention: insight.severity == InsightSeverity.attention,
+              Padding(
+                padding: const EdgeInsets.only(bottom: KurashilogSpacing.sm),
+                child: JournalCard(
+                  kind: JournalCardKind.insight,
+                  title: insight.title,
+                  subtitle: insight.severity.label,
+                  semanticLabel: '${insight.title}。${insight.body}',
+                  child: Text(insight.body),
+                ),
               ),
           ] else
             Card(
@@ -229,6 +255,29 @@ class _EmptyHome extends StatelessWidget {
   }
 }
 
+class _MiniMetric extends StatelessWidget {
+  const _MiniMetric({required this.metric});
+
+  final MetricCardData metric;
+
+  @override
+  Widget build(BuildContext context) {
+    return JournalCard(
+      kind: JournalCardKind.mini,
+      title: metric.label,
+      semanticLabel: '${metric.label} ${metric.value}',
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_iconFor(metric.icon), size: 20),
+          const SizedBox(width: KurashilogSpacing.xs),
+          Text(metric.value, style: Theme.of(context).textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+}
+
 class _StaleBanner extends StatelessWidget {
   const _StaleBanner({
     required this.quality,
@@ -285,52 +334,12 @@ class _StaleBanner extends StatelessWidget {
   }
 }
 
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({
-    required this.title,
-    required this.body,
-    required this.attention,
-  });
-
-  final String title;
-  final String body;
-  final bool attention;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final icon = attention ? Icons.star : Icons.lightbulb_outline;
-    final color = attention ? scheme.tertiary : scheme.primary;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(body, style: theme.textTheme.bodyMedium),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
+JournalCardKind journalKindForMetric(MetricIcon icon) => switch (icon) {
+  MetricIcon.walking => JournalCardKind.hero,
+  MetricIcon.route => JournalCardKind.mini,
+  MetricIcon.place => JournalCardKind.mini,
+  MetricIcon.explore => JournalCardKind.mini,
+};
 
 IconData _iconFor(MetricIcon icon) => switch (icon) {
   MetricIcon.walking => Icons.directions_walk,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/app/design_system.dart';
 import 'package:kurashilog/app/theme.dart';
+import 'package:kurashilog/domain/models/summaries.dart';
+import 'package:kurashilog/features/dashboard/home_screen.dart';
 
 void main() {
   test('light and dark themes expose the journal extension', () {
@@ -30,6 +32,13 @@ void main() {
     ], orderedEquals(<double>[4, 8, 12, 16, 24, 32, 48]));
     expect(KurashilogSize.minimumTapTarget, 48);
     expect(KurashilogRadius.large, greaterThan(KurashilogRadius.medium));
+  });
+
+  test('home metric hierarchy gives the primary metric the hero role', () {
+    expect(journalKindForMetric(MetricIcon.walking), JournalCardKind.hero);
+    expect(journalKindForMetric(MetricIcon.route), JournalCardKind.mini);
+    expect(journalKindForMetric(MetricIcon.place), JournalCardKind.mini);
+    expect(journalKindForMetric(MetricIcon.explore), JournalCardKind.mini);
   });
 
   testWidgets('all card kinds render without uniform visual density', (
