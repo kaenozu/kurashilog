@@ -234,6 +234,10 @@ class ImportUseCase {
       DateTime? addedMinAt;
       DateTime? addedMaxAt;
 
+      // トランザクションはレコード挿入のみに留める。分析（クラスタ・
+      // サマリー・インサイト再計算）はコミット後に実行し、分析中の
+      // クラッシュでも取り込み済みレコードを失わない。sourceKey の
+      // 重複排除により再実行は冪等。
       await repository.runInTransaction(() async {
         final records = parser.parse(file.openRead(), cancellation);
         await for (final batch in validator.validateBatches(
@@ -288,37 +292,39 @@ class ImportUseCase {
         if (cancellation.isCancelled) {
           throw const ImportParseException('IMP-005', 'キャンセルされました');
         }
-
-        if (addedVisits > 0 || addedMovements > 0) {
-          onProgress?.call(
-            const ImportProgress(ImportStage.clustering, percent: 75),
-          );
-          await analysis.rebuildAll();
-        }
-
-        if (cancellation.isCancelled) {
-          throw const ImportParseException('IMP-005', 'キャンセルされました');
-        }
-
-        onProgress?.call(
-          const ImportProgress(ImportStage.insights, percent: 95),
-        );
-        await repository.updateImport(
-          ImportedFileRecord(
-            id: importId,
-            fileHash: fileHash,
-            schemaType: parser.schemaType,
-            startedAt: startedAt,
-            completedAt: DateTime.now(),
-            sourceMinAt: sourceMinAt,
-            sourceMaxAt: sourceMaxAt,
-            status: 'completed',
-            warningCount: importWarningCount(warnings),
-            addedVisits: addedVisits,
-            addedMovements: addedMovements,
-          ),
-        );
       });
+
+      if (cancellation.isCancelled) {
+        throw const ImportParseException('IMP-005', 'キャンセルされました');
+      }
+
+      if (addedVisits > 0 || addedMovements > 0) {
+        onProgress?.call(
+          const ImportProgress(ImportStage.clustering, percent: 75),
+        );
+        await analysis.rebuildAll();
+      }
+
+      if (cancellation.isCancelled) {
+        throw const ImportParseException('IMP-005', 'キャンセルされました');
+      }
+
+      onProgress?.call(const ImportProgress(ImportStage.insights, percent: 95));
+      await repository.updateImport(
+        ImportedFileRecord(
+          id: importId,
+          fileHash: fileHash,
+          schemaType: parser.schemaType,
+          startedAt: startedAt,
+          completedAt: DateTime.now(),
+          sourceMinAt: sourceMinAt,
+          sourceMaxAt: sourceMaxAt,
+          status: 'completed',
+          warningCount: importWarningCount(warnings),
+          addedVisits: addedVisits,
+          addedMovements: addedMovements,
+        ),
+      );
 
       onProgress?.call(
         const ImportProgress(ImportStage.insights, percent: 100),
