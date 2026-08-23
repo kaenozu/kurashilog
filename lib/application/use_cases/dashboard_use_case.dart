@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../domain/models/data_quality.dart';
 import '../../domain/models/insight.dart';
 import '../../domain/models/summaries.dart';
@@ -152,21 +154,43 @@ class DashboardUseCase {
 
     final window = computeComparisonWindow(latestActivity.toLocal());
     final storedInsights = await repository.insightsForPeriod(window.periodKey);
-    final insightData = storedInsights
-        .where((i) => !i.dismissed)
-        .map(
-          (i) => InsightData(
-            ruleId: i.ruleId,
-            severity: i.severity == 'attention'
-                ? InsightSeverity.attention
-                : InsightSeverity.information,
-            title: i.title,
-            body: i.body,
-            score: 0,
-            metricJson: const {},
-          ),
-        )
-        .toList();
+    final insightData = storedInsights.where((i) => !i.dismissed).map((i) {
+      final decoded = jsonDecode(i.metricJson);
+      final metricJson = decoded is Map
+          ? Map<String, Object?>.from(decoded)
+          : const <String, Object?>{};
+      final evidence =
+          (metricJson['evidence'] is List
+                  ? metricJson['evidence'] as List
+                  : const <Object?>[])
+              .whereType<Map>()
+              .map(
+                (item) => InsightEvidence(
+                  type: item['type'] as String? ?? 'unknown',
+                  reference: item['reference'] as String? ?? 'unknown',
+                  level: InsightEvidenceLevel.values.firstWhere(
+                    (level) => level.name == item['level'],
+                    orElse: () => InsightEvidenceLevel.fact,
+                  ),
+                ),
+              )
+              .toList(growable: false);
+      return InsightData(
+        ruleId: i.ruleId,
+        severity: i.severity == 'attention'
+            ? InsightSeverity.attention
+            : InsightSeverity.information,
+        title: i.title,
+        body: i.body,
+        score: 0,
+        kind: InsightKind.values.firstWhere(
+          (kind) => kind.name == metricJson['kind'],
+          orElse: () => InsightKind.changedMetric,
+        ),
+        evidence: evidence,
+        metricJson: metricJson,
+      );
+    }).toList();
 
     // カレンダー用ヒートマップ（当月の外出有無）
     final daysInMonth = DateTime(mYear, mMonth + 1, 0).day;
@@ -189,7 +213,7 @@ class DashboardUseCase {
       freshness: freshnessResult,
       selectedMonth: month,
       metrics: metrics,
-      insights: insightData.take(3).toList(),
+      insights: insightData.take(5).toList(),
       heatmap: heatmap,
       monthly: monthly,
       previousMonthly: previous,
