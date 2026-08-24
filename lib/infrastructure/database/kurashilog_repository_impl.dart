@@ -146,6 +146,8 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     return _db.transaction(() async {
       final beforeVisits = await countVisits();
       final beforeMovements = await countMovements();
+      var updatedVisits = 0;
+      var updatedMovements = 0;
       await _db.batch((batch) {
         if (visits.isNotEmpty) {
           batch.insertAll(
@@ -162,12 +164,84 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
           );
         }
       });
+      for (final visit in visits) {
+        final rows = await (_db.select(
+          _db.visits,
+        )..where((table) => table.sourceKey.equals(visit.sourceKey))).get();
+        if (rows.isNotEmpty && _visitChanged(rows.single, visit)) {
+          await (_db.update(
+            _db.visits,
+          )..where((table) => table.sourceKey.equals(visit.sourceKey))).write(
+            VisitsCompanion(
+              startAtUtc: Value(visit.startAtUtc),
+              endAtUtc: Value(visit.endAtUtc),
+              latE7: Value(visit.latE7),
+              lngE7: Value(visit.lngE7),
+              accuracyM: Value(visit.accuracyM),
+              sourceLabel: Value(visit.sourceLabel),
+              confidence: Value(visit.confidence),
+            ),
+          );
+          updatedVisits++;
+        }
+      }
+      for (final movement in movements) {
+        final rows = await (_db.select(
+          _db.movements,
+        )..where((table) => table.sourceKey.equals(movement.sourceKey))).get();
+        if (rows.isNotEmpty && _movementChanged(rows.single, movement)) {
+          await (_db.update(_db.movements)
+                ..where((table) => table.sourceKey.equals(movement.sourceKey)))
+              .write(
+                MovementsCompanion(
+                  startAtUtc: Value(movement.startAtUtc),
+                  endAtUtc: Value(movement.endAtUtc),
+                  startLatE7: Value(movement.startLatLng?.latE7),
+                  startLngE7: Value(movement.startLatLng?.lngE7),
+                  endLatE7: Value(movement.endLatLng?.latE7),
+                  endLngE7: Value(movement.endLatLng?.lngE7),
+                  distanceM: Value(movement.distanceM),
+                  distanceMethod: Value(movement.distanceMethod.dbValue),
+                  activityType: Value(movement.activityType),
+                  confidence: Value(movement.confidence),
+                  pathJson: Value(_encodePath(movement.path)),
+                  validDistance: Value(movement.validDistance),
+                ),
+              );
+          updatedMovements++;
+        }
+      }
       return ImportDiffResult(
         addedVisits: await countVisits() - beforeVisits,
         addedMovements: await countMovements() - beforeMovements,
+        updatedVisits: updatedVisits,
+        updatedMovements: updatedMovements,
       );
     });
   }
+
+  bool _visitChanged(VisitRow row, StoredVisit value) =>
+      !row.startAtUtc.isAtSameMomentAs(value.startAtUtc) ||
+      !row.endAtUtc.isAtSameMomentAs(value.endAtUtc) ||
+      row.latE7 != value.latE7 ||
+      row.lngE7 != value.lngE7 ||
+      row.accuracyM != value.accuracyM ||
+      row.sourceLabel != value.sourceLabel ||
+      row.confidence != value.confidence;
+
+  bool _movementChanged(MovementRow row, StoredMovement value) =>
+      row.startAtUtc != value.startAtUtc ||
+      row.endAtUtc != value.endAtUtc ||
+      row.startLatE7 != value.startLatLng?.latE7 ||
+      row.startLngE7 != value.startLatLng?.lngE7 ||
+      row.endLatE7 != value.endLatLng?.latE7 ||
+      row.endLngE7 != value.endLatLng?.lngE7 ||
+      row.distanceM != value.distanceM ||
+      row.distanceMethod != value.distanceMethod.dbValue ||
+      row.activityType != value.activityType ||
+      row.confidence != value.confidence ||
+      row.pathJson != _encodePath(value.path) ||
+      row.validDistance != value.validDistance;
 
   @override
   Future<void> assignVisitClusterIds(Map<int, int> clusterIdByVisitId) {
