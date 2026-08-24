@@ -5191,6 +5191,579 @@ class AppSettingsCompanion extends UpdateCompanion<AppSettingRow> {
   }
 }
 
+class $UserMilestonesTable extends UserMilestones
+    with TableInfo<$UserMilestonesTable, UserMilestoneRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UserMilestonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _startDateMeta = const VerificationMeta(
+    'startDate',
+  );
+  @override
+  late final GeneratedColumn<String> startDate = GeneratedColumn<String>(
+    'start_date',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _endDateMeta = const VerificationMeta(
+    'endDate',
+  );
+  @override
+  late final GeneratedColumn<String> endDate = GeneratedColumn<String>(
+    'end_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _timeZoneIdMeta = const VerificationMeta(
+    'timeZoneId',
+  );
+  @override
+  late final GeneratedColumn<String> timeZoneId = GeneratedColumn<String>(
+    'time_zone_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _titleMeta = const VerificationMeta('title');
+  @override
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _noteMeta = const VerificationMeta('note');
+  @override
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sourceCandidateKeyMeta =
+      const VerificationMeta('sourceCandidateKey');
+  @override
+  late final GeneratedColumn<String> sourceCandidateKey =
+      GeneratedColumn<String>(
+        'source_candidate_key',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    startDate,
+    endDate,
+    timeZoneId,
+    title,
+    note,
+    sourceCandidateKey,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'user_milestones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UserMilestoneRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('start_date')) {
+      context.handle(
+        _startDateMeta,
+        startDate.isAcceptableOrUnknown(data['start_date']!, _startDateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_startDateMeta);
+    }
+    if (data.containsKey('end_date')) {
+      context.handle(
+        _endDateMeta,
+        endDate.isAcceptableOrUnknown(data['end_date']!, _endDateMeta),
+      );
+    }
+    if (data.containsKey('time_zone_id')) {
+      context.handle(
+        _timeZoneIdMeta,
+        timeZoneId.isAcceptableOrUnknown(
+          data['time_zone_id']!,
+          _timeZoneIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_timeZoneIdMeta);
+    }
+    if (data.containsKey('title')) {
+      context.handle(
+        _titleMeta,
+        title.isAcceptableOrUnknown(data['title']!, _titleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_titleMeta);
+    }
+    if (data.containsKey('note')) {
+      context.handle(
+        _noteMeta,
+        note.isAcceptableOrUnknown(data['note']!, _noteMeta),
+      );
+    }
+    if (data.containsKey('source_candidate_key')) {
+      context.handle(
+        _sourceCandidateKeyMeta,
+        sourceCandidateKey.isAcceptableOrUnknown(
+          data['source_candidate_key']!,
+          _sourceCandidateKeyMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  UserMilestoneRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UserMilestoneRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      startDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}start_date'],
+      )!,
+      endDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}end_date'],
+      ),
+      timeZoneId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}time_zone_id'],
+      )!,
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      )!,
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+      sourceCandidateKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_candidate_key'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $UserMilestonesTable createAlias(String alias) {
+    return $UserMilestonesTable(attachedDatabase, alias);
+  }
+}
+
+class UserMilestoneRow extends DataClass
+    implements Insertable<UserMilestoneRow> {
+  final String id;
+  final String startDate;
+  final String? endDate;
+  final String timeZoneId;
+  final String title;
+  final String? note;
+  final String? sourceCandidateKey;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const UserMilestoneRow({
+    required this.id,
+    required this.startDate,
+    this.endDate,
+    required this.timeZoneId,
+    required this.title,
+    this.note,
+    this.sourceCandidateKey,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['start_date'] = Variable<String>(startDate);
+    if (!nullToAbsent || endDate != null) {
+      map['end_date'] = Variable<String>(endDate);
+    }
+    map['time_zone_id'] = Variable<String>(timeZoneId);
+    map['title'] = Variable<String>(title);
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    if (!nullToAbsent || sourceCandidateKey != null) {
+      map['source_candidate_key'] = Variable<String>(sourceCandidateKey);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  UserMilestonesCompanion toCompanion(bool nullToAbsent) {
+    return UserMilestonesCompanion(
+      id: Value(id),
+      startDate: Value(startDate),
+      endDate: endDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(endDate),
+      timeZoneId: Value(timeZoneId),
+      title: Value(title),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+      sourceCandidateKey: sourceCandidateKey == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sourceCandidateKey),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory UserMilestoneRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UserMilestoneRow(
+      id: serializer.fromJson<String>(json['id']),
+      startDate: serializer.fromJson<String>(json['startDate']),
+      endDate: serializer.fromJson<String?>(json['endDate']),
+      timeZoneId: serializer.fromJson<String>(json['timeZoneId']),
+      title: serializer.fromJson<String>(json['title']),
+      note: serializer.fromJson<String?>(json['note']),
+      sourceCandidateKey: serializer.fromJson<String?>(
+        json['sourceCandidateKey'],
+      ),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'startDate': serializer.toJson<String>(startDate),
+      'endDate': serializer.toJson<String?>(endDate),
+      'timeZoneId': serializer.toJson<String>(timeZoneId),
+      'title': serializer.toJson<String>(title),
+      'note': serializer.toJson<String?>(note),
+      'sourceCandidateKey': serializer.toJson<String?>(sourceCandidateKey),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  UserMilestoneRow copyWith({
+    String? id,
+    String? startDate,
+    Value<String?> endDate = const Value.absent(),
+    String? timeZoneId,
+    String? title,
+    Value<String?> note = const Value.absent(),
+    Value<String?> sourceCandidateKey = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => UserMilestoneRow(
+    id: id ?? this.id,
+    startDate: startDate ?? this.startDate,
+    endDate: endDate.present ? endDate.value : this.endDate,
+    timeZoneId: timeZoneId ?? this.timeZoneId,
+    title: title ?? this.title,
+    note: note.present ? note.value : this.note,
+    sourceCandidateKey: sourceCandidateKey.present
+        ? sourceCandidateKey.value
+        : this.sourceCandidateKey,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  UserMilestoneRow copyWithCompanion(UserMilestonesCompanion data) {
+    return UserMilestoneRow(
+      id: data.id.present ? data.id.value : this.id,
+      startDate: data.startDate.present ? data.startDate.value : this.startDate,
+      endDate: data.endDate.present ? data.endDate.value : this.endDate,
+      timeZoneId: data.timeZoneId.present
+          ? data.timeZoneId.value
+          : this.timeZoneId,
+      title: data.title.present ? data.title.value : this.title,
+      note: data.note.present ? data.note.value : this.note,
+      sourceCandidateKey: data.sourceCandidateKey.present
+          ? data.sourceCandidateKey.value
+          : this.sourceCandidateKey,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserMilestoneRow(')
+          ..write('id: $id, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('timeZoneId: $timeZoneId, ')
+          ..write('title: $title, ')
+          ..write('note: $note, ')
+          ..write('sourceCandidateKey: $sourceCandidateKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    startDate,
+    endDate,
+    timeZoneId,
+    title,
+    note,
+    sourceCandidateKey,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UserMilestoneRow &&
+          other.id == this.id &&
+          other.startDate == this.startDate &&
+          other.endDate == this.endDate &&
+          other.timeZoneId == this.timeZoneId &&
+          other.title == this.title &&
+          other.note == this.note &&
+          other.sourceCandidateKey == this.sourceCandidateKey &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class UserMilestonesCompanion extends UpdateCompanion<UserMilestoneRow> {
+  final Value<String> id;
+  final Value<String> startDate;
+  final Value<String?> endDate;
+  final Value<String> timeZoneId;
+  final Value<String> title;
+  final Value<String?> note;
+  final Value<String?> sourceCandidateKey;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const UserMilestonesCompanion({
+    this.id = const Value.absent(),
+    this.startDate = const Value.absent(),
+    this.endDate = const Value.absent(),
+    this.timeZoneId = const Value.absent(),
+    this.title = const Value.absent(),
+    this.note = const Value.absent(),
+    this.sourceCandidateKey = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UserMilestonesCompanion.insert({
+    required String id,
+    required String startDate,
+    this.endDate = const Value.absent(),
+    required String timeZoneId,
+    required String title,
+    this.note = const Value.absent(),
+    this.sourceCandidateKey = const Value.absent(),
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       startDate = Value(startDate),
+       timeZoneId = Value(timeZoneId),
+       title = Value(title),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<UserMilestoneRow> custom({
+    Expression<String>? id,
+    Expression<String>? startDate,
+    Expression<String>? endDate,
+    Expression<String>? timeZoneId,
+    Expression<String>? title,
+    Expression<String>? note,
+    Expression<String>? sourceCandidateKey,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (startDate != null) 'start_date': startDate,
+      if (endDate != null) 'end_date': endDate,
+      if (timeZoneId != null) 'time_zone_id': timeZoneId,
+      if (title != null) 'title': title,
+      if (note != null) 'note': note,
+      if (sourceCandidateKey != null)
+        'source_candidate_key': sourceCandidateKey,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UserMilestonesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? startDate,
+    Value<String?>? endDate,
+    Value<String>? timeZoneId,
+    Value<String>? title,
+    Value<String?>? note,
+    Value<String?>? sourceCandidateKey,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return UserMilestonesCompanion(
+      id: id ?? this.id,
+      startDate: startDate ?? this.startDate,
+      endDate: endDate ?? this.endDate,
+      timeZoneId: timeZoneId ?? this.timeZoneId,
+      title: title ?? this.title,
+      note: note ?? this.note,
+      sourceCandidateKey: sourceCandidateKey ?? this.sourceCandidateKey,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (startDate.present) {
+      map['start_date'] = Variable<String>(startDate.value);
+    }
+    if (endDate.present) {
+      map['end_date'] = Variable<String>(endDate.value);
+    }
+    if (timeZoneId.present) {
+      map['time_zone_id'] = Variable<String>(timeZoneId.value);
+    }
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    if (sourceCandidateKey.present) {
+      map['source_candidate_key'] = Variable<String>(sourceCandidateKey.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UserMilestonesCompanion(')
+          ..write('id: $id, ')
+          ..write('startDate: $startDate, ')
+          ..write('endDate: $endDate, ')
+          ..write('timeZoneId: $timeZoneId, ')
+          ..write('title: $title, ')
+          ..write('note: $note, ')
+          ..write('sourceCandidateKey: $sourceCandidateKey, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -5207,6 +5780,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   );
   late final $InsightsTable insights = $InsightsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $UserMilestonesTable userMilestones = $UserMilestonesTable(this);
   late final Index visitsStartIdx = Index(
     'visits_start_idx',
     'CREATE INDEX visits_start_idx ON visits (start_at_utc)',
@@ -5245,6 +5819,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     monthlySummaries,
     insights,
     appSettings,
+    userMilestones,
     visitsStartIdx,
     visitsClusterIdx,
     movementsStartIdx,
@@ -7804,6 +8379,292 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSettingRow,
       PrefetchHooks Function()
     >;
+typedef $$UserMilestonesTableCreateCompanionBuilder =
+    UserMilestonesCompanion Function({
+      required String id,
+      required String startDate,
+      Value<String?> endDate,
+      required String timeZoneId,
+      required String title,
+      Value<String?> note,
+      Value<String?> sourceCandidateKey,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$UserMilestonesTableUpdateCompanionBuilder =
+    UserMilestonesCompanion Function({
+      Value<String> id,
+      Value<String> startDate,
+      Value<String?> endDate,
+      Value<String> timeZoneId,
+      Value<String> title,
+      Value<String?> note,
+      Value<String?> sourceCandidateKey,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$UserMilestonesTableFilterComposer
+    extends Composer<_$AppDatabase, $UserMilestonesTable> {
+  $$UserMilestonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get timeZoneId => $composableBuilder(
+    column: $table.timeZoneId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get sourceCandidateKey => $composableBuilder(
+    column: $table.sourceCandidateKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$UserMilestonesTableOrderingComposer
+    extends Composer<_$AppDatabase, $UserMilestonesTable> {
+  $$UserMilestonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get startDate => $composableBuilder(
+    column: $table.startDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get endDate => $composableBuilder(
+    column: $table.endDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get timeZoneId => $composableBuilder(
+    column: $table.timeZoneId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get title => $composableBuilder(
+    column: $table.title,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get note => $composableBuilder(
+    column: $table.note,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get sourceCandidateKey => $composableBuilder(
+    column: $table.sourceCandidateKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$UserMilestonesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UserMilestonesTable> {
+  $$UserMilestonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get startDate =>
+      $composableBuilder(column: $table.startDate, builder: (column) => column);
+
+  GeneratedColumn<String> get endDate =>
+      $composableBuilder(column: $table.endDate, builder: (column) => column);
+
+  GeneratedColumn<String> get timeZoneId => $composableBuilder(
+    column: $table.timeZoneId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get title =>
+      $composableBuilder(column: $table.title, builder: (column) => column);
+
+  GeneratedColumn<String> get note =>
+      $composableBuilder(column: $table.note, builder: (column) => column);
+
+  GeneratedColumn<String> get sourceCandidateKey => $composableBuilder(
+    column: $table.sourceCandidateKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$UserMilestonesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $UserMilestonesTable,
+          UserMilestoneRow,
+          $$UserMilestonesTableFilterComposer,
+          $$UserMilestonesTableOrderingComposer,
+          $$UserMilestonesTableAnnotationComposer,
+          $$UserMilestonesTableCreateCompanionBuilder,
+          $$UserMilestonesTableUpdateCompanionBuilder,
+          (
+            UserMilestoneRow,
+            BaseReferences<
+              _$AppDatabase,
+              $UserMilestonesTable,
+              UserMilestoneRow
+            >,
+          ),
+          UserMilestoneRow,
+          PrefetchHooks Function()
+        > {
+  $$UserMilestonesTableTableManager(
+    _$AppDatabase db,
+    $UserMilestonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UserMilestonesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UserMilestonesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$UserMilestonesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> startDate = const Value.absent(),
+                Value<String?> endDate = const Value.absent(),
+                Value<String> timeZoneId = const Value.absent(),
+                Value<String> title = const Value.absent(),
+                Value<String?> note = const Value.absent(),
+                Value<String?> sourceCandidateKey = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UserMilestonesCompanion(
+                id: id,
+                startDate: startDate,
+                endDate: endDate,
+                timeZoneId: timeZoneId,
+                title: title,
+                note: note,
+                sourceCandidateKey: sourceCandidateKey,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String startDate,
+                Value<String?> endDate = const Value.absent(),
+                required String timeZoneId,
+                required String title,
+                Value<String?> note = const Value.absent(),
+                Value<String?> sourceCandidateKey = const Value.absent(),
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => UserMilestonesCompanion.insert(
+                id: id,
+                startDate: startDate,
+                endDate: endDate,
+                timeZoneId: timeZoneId,
+                title: title,
+                note: note,
+                sourceCandidateKey: sourceCandidateKey,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$UserMilestonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $UserMilestonesTable,
+      UserMilestoneRow,
+      $$UserMilestonesTableFilterComposer,
+      $$UserMilestonesTableOrderingComposer,
+      $$UserMilestonesTableAnnotationComposer,
+      $$UserMilestonesTableCreateCompanionBuilder,
+      $$UserMilestonesTableUpdateCompanionBuilder,
+      (
+        UserMilestoneRow,
+        BaseReferences<_$AppDatabase, $UserMilestonesTable, UserMilestoneRow>,
+      ),
+      UserMilestoneRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -7826,4 +8687,6 @@ class $AppDatabaseManager {
       $$InsightsTableTableManager(_db, _db.insights);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$UserMilestonesTableTableManager get userMilestones =>
+      $$UserMilestonesTableTableManager(_db, _db.userMilestones);
 }

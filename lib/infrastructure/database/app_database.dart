@@ -21,6 +21,7 @@ part 'app_database.g.dart';
     MonthlySummaries,
     Insights,
     AppSettings,
+    UserMilestones,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -42,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -56,6 +57,9 @@ class AppDatabase extends _$AppDatabase {
           "UPDATE place_clusters SET privacy_mode = 'exclude' "
           'WHERE excluded = 1',
         );
+      }
+      if (from < 3) {
+        await m.createTable(userMilestones);
       }
     },
     beforeOpen: (details) async {

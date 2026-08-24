@@ -142,3 +142,19 @@ class AppSettings extends Table {
   @override
   Set<Column> get primaryKey => {key};
 }
+
+@DataClassName('UserMilestoneRow')
+class UserMilestones extends Table {
+  TextColumn get id => text()();
+  TextColumn get startDate => text()();
+  TextColumn get endDate => text().nullable()();
+  TextColumn get timeZoneId => text()();
+  TextColumn get title => text()();
+  TextColumn get note => text().nullable()();
+  TextColumn get sourceCandidateKey => text().nullable()();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}

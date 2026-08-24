@@ -1,4 +1,5 @@
 import '../models/persistence_models.dart';
+import '../../domain/change_detection/change_point.dart';
 
 /// 永続化の抽象リポジトリ。
 abstract interface class KurashilogRepository {
@@ -61,6 +62,11 @@ abstract interface class KurashilogRepository {
 
   Future<AppSettingRecord?> getSetting(String key);
   Future<void> setSetting(String key, String value);
+
+  Future<void> insertMilestone(LifeMilestone milestone);
+  Future<void> updateMilestone(LifeMilestone milestone);
+  Future<List<LifeMilestone>> allMilestones();
+  Future<void> deleteMilestone(String id);
 
   Future<void> deleteAllUserData();
 }
