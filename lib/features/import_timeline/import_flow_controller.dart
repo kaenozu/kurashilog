@@ -169,7 +169,17 @@ class ImportFlowNotifier extends Notifier<ImportFlowState> {
     }
   }
 
-  void cancel() => _token?.cancel();
+  /// 処理を中断し、途中の一時ファイルを残さず待機状態へ戻す。
+  ///
+  /// CancellationToken の通知だけでは、非同期処理が完了するまで画面が
+  /// importing のままになり、戻る操作や再取込を始められない。先に世代を
+  /// 無効化してからキャッシュを削除することで、遅れて届く進捗も無視する。
+  Future<void> cancel() async {
+    _token?.cancel();
+    _token = null;
+    await _cleanupCache();
+    state = ImportFlowState.idle;
+  }
 
   /// フローを閉じる（キャッシュも削除）。
   Future<void> dismiss() async {

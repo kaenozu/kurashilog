@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -17,8 +19,13 @@ class ImportFlowScreen extends ConsumerWidget {
       canPop:
           state.phase == ImportPhase.idle || state.phase == ImportPhase.done,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          ref.read(importFlowProvider.notifier).cancel();
+        final notifier = ref.read(importFlowProvider.notifier);
+        if (state.phase == ImportPhase.importing) {
+          unawaited(notifier.cancel());
+        } else if (didPop) {
+          // PopScope allows the route to leave during preview/error. Clean up
+          // the cache even when the user uses the system back gesture/button.
+          unawaited(notifier.dismiss());
         }
       },
       child: Scaffold(
