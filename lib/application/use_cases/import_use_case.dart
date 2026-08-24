@@ -54,6 +54,8 @@ class ImportResult {
     required this.ok,
     this.addedVisits = 0,
     this.addedMovements = 0,
+    this.updatedVisits = 0,
+    this.updatedMovements = 0,
     this.sourceMinAt,
     this.sourceMaxAt,
     this.warnings = const [],
@@ -68,6 +70,8 @@ class ImportResult {
   final bool ok;
   final int addedVisits;
   final int addedMovements;
+  final int updatedVisits;
+  final int updatedMovements;
   final DateTime? sourceMinAt;
   final DateTime? sourceMaxAt;
   final List<ImportWarning> warnings;
@@ -231,6 +235,8 @@ class ImportUseCase {
       DateTime? sourceMaxAt;
       var addedVisits = 0;
       var addedMovements = 0;
+      var updatedVisits = 0;
+      var updatedMovements = 0;
       DateTime? addedMinAt;
       DateTime? addedMaxAt;
 
@@ -257,6 +263,8 @@ class ImportUseCase {
             );
             addedVisits += diff.addedVisits;
             addedMovements += diff.addedMovements;
+            updatedVisits += diff.updatedVisits;
+            updatedMovements += diff.updatedMovements;
 
             final batchMin = _minStart(batch.visits, batch.movements);
             if (diff.addedVisits > 0 || diff.addedMovements > 0) {
@@ -339,6 +347,8 @@ class ImportUseCase {
         ok: true,
         addedVisits: addedVisits,
         addedMovements: addedMovements,
+        updatedVisits: updatedVisits,
+        updatedMovements: updatedMovements,
         sourceMinAt: sourceMinAt,
         sourceMaxAt: sourceMaxAt,
         warnings: warnings,

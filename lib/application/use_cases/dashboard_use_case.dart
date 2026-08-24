@@ -4,6 +4,8 @@ import '../../domain/models/data_quality.dart';
 import '../../domain/models/insight.dart';
 import '../../domain/models/summaries.dart';
 import '../../domain/rules/insight_engine.dart';
+
+import '../../domain/privacy/place_privacy.dart';
 import '../../domain/services/freshness_service.dart';
 import '../../domain/services/summary_service.dart';
 import '../analysis/analysis_coordinator.dart';
@@ -284,13 +286,16 @@ class DashboardUseCase {
     final insights = await analysis.insightsForMonth(yearMonth);
 
     final clusters = await repository.allClusters();
+    const privacy = PlacePrivacyProjector();
     final newClusterNames = <String>[];
     if (monthly != null) {
       final prevIds = previous?.clusterIds ?? const <int>{};
       for (final id in monthly.clusterIds) {
         if (prevIds.contains(id)) continue;
-        final c = clusters.where((c) => c.id == id).firstOrNull;
-        if (c != null && !c.excluded) newClusterNames.add(c.displayName);
+        final cluster = clusters.where((c) => c.id == id).firstOrNull;
+        if (cluster == null) continue;
+        final projection = privacy.forApp(cluster);
+        if (projection != null) newClusterNames.add(projection.displayName);
       }
     }
 

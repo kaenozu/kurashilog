@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../../application/models/persistence_models.dart';
 import '../../application/repositories/kurashilog_repository.dart';
+import '../../domain/change_detection/change_point.dart';
 import 'app_database_handle.dart';
 import 'correction_preserving_repository.dart';
 
@@ -197,6 +198,22 @@ class ResettableKurashilogRepository implements KurashilogRepository {
   @override
   Future<void> setSetting(String key, String value) =>
       _run((repository) => repository.setSetting(key, value));
+
+  @override
+  Future<void> insertMilestone(LifeMilestone milestone) =>
+      _run((repository) => repository.insertMilestone(milestone));
+
+  @override
+  Future<void> updateMilestone(LifeMilestone milestone) =>
+      _run((repository) => repository.updateMilestone(milestone));
+
+  @override
+  Future<List<LifeMilestone>> allMilestones() =>
+      _run((repository) => repository.allMilestones());
+
+  @override
+  Future<void> deleteMilestone(String id) =>
+      _run((repository) => repository.deleteMilestone(id));
 
   @override
   Future<void> deleteAllUserData() => _handle.reset();

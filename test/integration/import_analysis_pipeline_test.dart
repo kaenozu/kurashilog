@@ -107,6 +107,8 @@ void main() {
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
       expect(second.addedMovements, 0);
+      expect(second.updatedVisits, 0);
+      expect(second.updatedMovements, 0);
       expect(await repository.countVisits(), visitCount);
       expect(await repository.countMovements(), movementCount);
 

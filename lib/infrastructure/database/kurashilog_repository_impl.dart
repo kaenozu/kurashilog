@@ -2,6 +2,8 @@ import 'package:drift/drift.dart';
 
 import '../../application/models/persistence_models.dart';
 import '../../application/repositories/kurashilog_repository.dart';
+import '../../domain/change_detection/change_point.dart';
+import '../../domain/models/comparison.dart';
 import '../../domain/models/distance_method.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/models/summaries.dart';
@@ -146,6 +148,8 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     return _db.transaction(() async {
       final beforeVisits = await countVisits();
       final beforeMovements = await countMovements();
+      var updatedVisits = 0;
+      var updatedMovements = 0;
       await _db.batch((batch) {
         if (visits.isNotEmpty) {
           batch.insertAll(
@@ -162,12 +166,84 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
           );
         }
       });
+      for (final visit in visits) {
+        final rows = await (_db.select(
+          _db.visits,
+        )..where((table) => table.sourceKey.equals(visit.sourceKey))).get();
+        if (rows.isNotEmpty && _visitChanged(rows.single, visit)) {
+          await (_db.update(
+            _db.visits,
+          )..where((table) => table.sourceKey.equals(visit.sourceKey))).write(
+            VisitsCompanion(
+              startAtUtc: Value(visit.startAtUtc),
+              endAtUtc: Value(visit.endAtUtc),
+              latE7: Value(visit.latE7),
+              lngE7: Value(visit.lngE7),
+              accuracyM: Value(visit.accuracyM),
+              sourceLabel: Value(visit.sourceLabel),
+              confidence: Value(visit.confidence),
+            ),
+          );
+          updatedVisits++;
+        }
+      }
+      for (final movement in movements) {
+        final rows = await (_db.select(
+          _db.movements,
+        )..where((table) => table.sourceKey.equals(movement.sourceKey))).get();
+        if (rows.isNotEmpty && _movementChanged(rows.single, movement)) {
+          await (_db.update(_db.movements)
+                ..where((table) => table.sourceKey.equals(movement.sourceKey)))
+              .write(
+                MovementsCompanion(
+                  startAtUtc: Value(movement.startAtUtc),
+                  endAtUtc: Value(movement.endAtUtc),
+                  startLatE7: Value(movement.startLatLng?.latE7),
+                  startLngE7: Value(movement.startLatLng?.lngE7),
+                  endLatE7: Value(movement.endLatLng?.latE7),
+                  endLngE7: Value(movement.endLatLng?.lngE7),
+                  distanceM: Value(movement.distanceM),
+                  distanceMethod: Value(movement.distanceMethod.dbValue),
+                  activityType: Value(movement.activityType),
+                  confidence: Value(movement.confidence),
+                  pathJson: Value(_encodePath(movement.path)),
+                  validDistance: Value(movement.validDistance),
+                ),
+              );
+          updatedMovements++;
+        }
+      }
       return ImportDiffResult(
         addedVisits: await countVisits() - beforeVisits,
         addedMovements: await countMovements() - beforeMovements,
+        updatedVisits: updatedVisits,
+        updatedMovements: updatedMovements,
       );
     });
   }
+
+  bool _visitChanged(VisitRow row, StoredVisit value) =>
+      !row.startAtUtc.isAtSameMomentAs(value.startAtUtc) ||
+      !row.endAtUtc.isAtSameMomentAs(value.endAtUtc) ||
+      row.latE7 != value.latE7 ||
+      row.lngE7 != value.lngE7 ||
+      row.accuracyM != value.accuracyM ||
+      row.sourceLabel != value.sourceLabel ||
+      row.confidence != value.confidence;
+
+  bool _movementChanged(MovementRow row, StoredMovement value) =>
+      row.startAtUtc != value.startAtUtc ||
+      row.endAtUtc != value.endAtUtc ||
+      row.startLatE7 != value.startLatLng?.latE7 ||
+      row.startLngE7 != value.startLatLng?.lngE7 ||
+      row.endLatE7 != value.endLatLng?.latE7 ||
+      row.endLngE7 != value.endLatLng?.lngE7 ||
+      row.distanceM != value.distanceM ||
+      row.distanceMethod != value.distanceMethod.dbValue ||
+      row.activityType != value.activityType ||
+      row.confidence != value.confidence ||
+      row.pathJson != _encodePath(value.path) ||
+      row.validDistance != value.validDistance;
 
   @override
   Future<void> assignVisitClusterIds(Map<int, int> clusterIdByVisitId) {
@@ -493,6 +569,68 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       );
 
   @override
+  Future<void> insertMilestone(LifeMilestone milestone) async {
+    await _db.into(_db.userMilestones).insert(_milestoneToDb(milestone));
+  }
+
+  @override
+  Future<void> updateMilestone(LifeMilestone milestone) async {
+    final updated =
+        await (_db.update(_db.userMilestones)
+              ..where((table) => table.id.equals(milestone.id)))
+            .write(_milestoneToDb(milestone));
+    if (updated != 1) {
+      throw StateError('Milestone ${milestone.id} was not found');
+    }
+  }
+
+  @override
+  Future<List<LifeMilestone>> allMilestones() async =>
+      (await (_db.select(
+            _db.userMilestones,
+          )..orderBy([(table) => OrderingTerm.asc(table.startDate)])).get())
+          .map(_milestoneToDomain)
+          .toList();
+
+  @override
+  Future<void> deleteMilestone(String id) async {
+    await (_db.delete(
+      _db.userMilestones,
+    )..where((table) => table.id.equals(id))).go();
+  }
+
+  UserMilestonesCompanion _milestoneToDb(LifeMilestone milestone) =>
+      UserMilestonesCompanion.insert(
+        id: milestone.id,
+        startDate: milestone.range.startInclusive.toIso8601String(),
+        endDate: Value(milestone.range.endExclusive.toIso8601String()),
+        timeZoneId: milestone.range.timeZoneId,
+        title: milestone.title,
+        note: Value(milestone.note),
+        sourceCandidateKey: Value(milestone.sourceCandidateKey),
+        createdAt: milestone.createdAt,
+        updatedAt: DateTime.now().toUtc(),
+      );
+
+  LifeMilestone _milestoneToDomain(UserMilestoneRow row) => LifeMilestone(
+    id: row.id,
+    title: row.title,
+    range: LocalDateRange(
+      startInclusive: _localDate(row.startDate),
+      endExclusive: _localDate(row.endDate!),
+      timeZoneId: row.timeZoneId,
+    ),
+    createdAt: row.createdAt,
+    note: row.note,
+    sourceCandidateKey: row.sourceCandidateKey,
+  );
+
+  LocalDate _localDate(String value) {
+    final parts = value.split('-').map(int.parse).toList();
+    return LocalDate(parts[0], parts[1], parts[2]);
+  }
+
+  @override
   Future<void> deleteAllUserData() {
     return _db.transaction(() async {
       await _db.delete(_db.insights).go();
@@ -504,6 +642,7 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
       await _db.delete(_db.visits).go();
       await _db.delete(_db.timelineImports).go();
       await _db.delete(_db.appSettings).go();
+      await _db.delete(_db.userMilestones).go();
     });
   }
 
