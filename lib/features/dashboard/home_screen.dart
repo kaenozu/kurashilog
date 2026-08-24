@@ -5,7 +5,9 @@ import '../../app/design_system.dart';
 import '../../application/providers.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
 import '../../domain/models/data_quality.dart';
+import '../../domain/models/insight.dart';
 import '../../domain/models/summaries.dart';
+import '../../shared/evidence_details.dart';
 import '../../shared/widgets.dart';
 import '../import_timeline/import_flow_screen.dart';
 
@@ -177,7 +179,23 @@ class _HomeBody extends ConsumerWidget {
                   title: insight.title,
                   subtitle: insight.severity.label,
                   semanticLabel: '${insight.title}。${insight.body}',
-                  child: Text(insight.body),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(insight.body),
+                      if (insight.evidence.isNotEmpty) ...[
+                        const SizedBox(height: KurashilogSpacing.sm),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () => _showEvidence(context, insight),
+                            icon: const Icon(Icons.fact_check_outlined),
+                            label: const Text('根拠を確認'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
           ] else
@@ -193,6 +211,19 @@ class _HomeBody extends ConsumerWidget {
             ),
           const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Future<void> _showEvidence(BuildContext context, InsightData insight) {
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          child: EvidenceDetails(evidence: insight.evidence),
+        ),
       ),
     );
   }
