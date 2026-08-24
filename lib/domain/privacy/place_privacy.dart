@@ -44,11 +44,21 @@ class PlaceShareProjection {
 class PlacePrivacyProjector {
   const PlacePrivacyProjector({this.blurGridE7 = 100000});
 
+  static const _sensitiveCategories = <String>{
+    'home',
+    'work',
+    'school',
+    'hospital',
+    'private',
+    'friend_home',
+  };
+
   /// 0.01 degree, roughly 1 km in latitude. Exact coordinates are never used
   /// in a share projection.
   final int blurGridE7;
 
   PlaceProjection? forApp(StoredCluster cluster) {
+    if (cluster.excludedFromAnalysis) return null;
     final mode = cluster.privacyMode;
     if (mode == PlacePrivacyMode.exclude) return null;
     final hideName = mode == PlacePrivacyMode.hideName;
@@ -65,9 +75,13 @@ class PlacePrivacyProjector {
   }
 
   PlaceShareProjection? forSharing(StoredCluster cluster) {
+    if (cluster.excludedFromAnalysis) return null;
     final mode = cluster.privacyMode;
     if (mode == PlacePrivacyMode.exclude) return null;
-    final redact = mode == PlacePrivacyMode.hideName || cluster.isBasePlace;
+    final redact =
+        mode == PlacePrivacyMode.hideName ||
+        cluster.isBasePlace ||
+        _sensitiveCategories.contains(cluster.category?.toLowerCase());
     return PlaceShareProjection(
       displayName: redact ? '非公開の場所' : cluster.displayName,
       category: redact ? null : cluster.category,

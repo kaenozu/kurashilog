@@ -61,6 +61,28 @@ void main() {
     expect(encoded, isNot(contains('1397671234')));
   });
 
+  test('legacy exclusion is hidden from app and sharing projections', () {
+    final cluster = sample(
+      privacyMode: PlacePrivacyMode.visible,
+      excluded: true,
+    );
+
+    expect(projector.forApp(cluster), isNull);
+    expect(projector.forSharing(cluster), isNull);
+  });
+
+  test(
+    'sensitive inferred categories are redacted from sharing by default',
+    () {
+      final shared = projector.forSharing(
+        sample(privacyMode: PlacePrivacyMode.visible, category: 'hospital'),
+      )!;
+
+      expect(shared.displayName, '非公開の場所');
+      expect(shared.category, isNull);
+    },
+  );
+
   test('legacy and unknown persisted values fail closed', () {
     expect(
       PlacePrivacyMode.parse('visible', legacyExcluded: true),
@@ -80,6 +102,8 @@ void main() {
 StoredCluster sample({
   required PlacePrivacyMode privacyMode,
   bool isBasePlace = false,
+  bool excluded = false,
+  String? category = 'park',
 }) => StoredCluster(
   id: 42,
   stableKey: 'anonymous-stable-key',
@@ -91,7 +115,8 @@ StoredCluster sample({
   firstAt: DateTime.utc(2026, 1, 1),
   lastAt: DateTime.utc(2026, 2, 1),
   labelName: '公園',
-  category: 'park',
+  category: category,
+  excluded: excluded,
   isBasePlace: isBasePlace,
   privacyMode: privacyMode,
 );
