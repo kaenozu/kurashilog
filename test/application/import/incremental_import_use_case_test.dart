@@ -86,6 +86,7 @@ void main() {
       expect(first.ok, isTrue);
       expect(second.ok, isTrue);
       expect(second.addedVisits, 0);
+      expect(second.updatedVisits, 0);
       expect(second.reconciliation.kind, ImportReconciliationKind.noChanges);
       expect(parser.parseCount, 2);
       expect(analysis.rebuildCount, 1);

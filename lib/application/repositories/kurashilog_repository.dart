@@ -75,8 +75,12 @@ class ImportDiffResult {
   const ImportDiffResult({
     required this.addedVisits,
     required this.addedMovements,
+    this.updatedVisits = 0,
+    this.updatedMovements = 0,
   });
 
   final int addedVisits;
   final int addedMovements;
+  final int updatedVisits;
+  final int updatedMovements;
 }

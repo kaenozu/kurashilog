@@ -212,6 +212,47 @@ void main() {
     expect(await repository.countVisits(), 1);
     expect(await repository.countMovements(), 1);
   });
+
+  test(
+    'reimport updates source fields while preserving user cluster override',
+    () async {
+      final at = DateTime.utc(2026, 7, 1);
+      final original = StoredVisit(
+        id: 0,
+        sourceKey: 'visit-corrected-source-key',
+        startAtUtc: at,
+        endAtUtc: at.add(const Duration(hours: 1)),
+        latE7: 351234560,
+        lngE7: 1396543210,
+      );
+      final corrected = StoredVisit(
+        id: 0,
+        sourceKey: original.sourceKey,
+        startAtUtc: original.startAtUtc,
+        endAtUtc: original.endAtUtc,
+        latE7: 351234561,
+        lngE7: original.lngE7,
+      );
+
+      await repository.insertNewRecords(
+        visits: [original],
+        movements: const [],
+      );
+      final stored = (await repository.allVisits()).single;
+      await repository.assignVisitClusterIds({stored.id: 7});
+
+      final diff = await repository.insertNewRecords(
+        visits: [corrected],
+        movements: const [],
+      );
+
+      expect(diff.addedVisits, 0);
+      expect(diff.updatedVisits, 1);
+      final reread = (await repository.allVisits()).single;
+      expect(reread.latE7, corrected.latE7);
+      expect(reread.clusterId, 7);
+    },
+  );
 }
 
 StoredCluster _cluster(
