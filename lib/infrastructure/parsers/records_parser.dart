@@ -16,6 +16,7 @@ class RecordsTimelineParser implements TimelineParser {
       schemaType: 'timeline-records',
     ),
     this.distanceService = const DistanceService(),
+    this.legacyMaxPoints = defaultLegacyMaxPoints,
   });
 
   final SourceKeyGenerator sourceKeyGenerator;
@@ -23,6 +24,24 @@ class RecordsTimelineParser implements TimelineParser {
 
   static const double legacyStayRadiusM = 150.0;
   static const int legacyMinConsecutivePoints = 2;
+
+  /// 旧形式 locations は滞在導出のため点列をバッファする。
+  /// 数百万点でのメモリ枯渇を防ぐ安全弁として、この点数を超えた時点で
+  /// IMP-006 により取込を中断する。
+  static const int defaultLegacyMaxPoints = 2000000;
+  static const String legacyLimitErrorCode = 'IMP-006';
+
+  final int legacyMaxPoints;
+
+  /// バッファ済み旧形式点列が上限を超えたら中断用エラーを投げる。
+  void _ensureLegacyCapacity(int bufferedCount) {
+    if (bufferedCount < legacyMaxPoints) return;
+    throw ImportParseException(
+      legacyLimitErrorCode,
+      '旧形式（locations）の点数が上限 $legacyMaxPoints 点を超えたため'
+      '取り込みを中断しました',
+    );
+  }
 
   @override
   String get schemaType => 'timeline-records';
@@ -53,24 +72,29 @@ class RecordsTimelineParser implements TimelineParser {
     }
 
     ImportParseException? parseError;
-    await _scan(
-      source,
-      token,
-      onSegment: (segment) {
-        if (_segmentToRecord(segment, warn: warn) != null) count++;
-        final (start, end) = _segmentRange(segment);
-        mergeRange(start, end);
-      },
-      onLegacyPoint: (point) {
-        count++;
-        legacyPoints.add(point);
-        mergeRange(point.at, point.at);
-      },
-      onUnsupportedSegment: () => warn('PAR-001', '未対応のセグメントを無視しました'),
-      onError: (code, message) {
-        parseError ??= ImportParseException(code, message);
-      },
-    );
+    try {
+      await _scan(
+        source,
+        token,
+        onSegment: (segment) {
+          if (_segmentToRecord(segment, warn: warn) != null) count++;
+          final (start, end) = _segmentRange(segment);
+          mergeRange(start, end);
+        },
+        onLegacyPoint: (point) {
+          _ensureLegacyCapacity(legacyPoints.length);
+          count++;
+          legacyPoints.add(point);
+          mergeRange(point.at, point.at);
+        },
+        onUnsupportedSegment: () => warn('PAR-001', '未対応のセグメントを無視しました'),
+        onError: (code, message) {
+          parseError ??= ImportParseException(code, message);
+        },
+      );
+    } on ImportParseException catch (error) {
+      parseError ??= error;
+    }
 
     if (token.isCancelled) {
       return const PreviewResult(
@@ -137,7 +161,10 @@ class RecordsTimelineParser implements TimelineParser {
           final record = _segmentToRecord(segment);
           if (record != null) controller.add(record);
         },
-        onLegacyPoint: legacyPoints.add,
+        onLegacyPoint: (point) {
+          _ensureLegacyCapacity(legacyPoints.length);
+          legacyPoints.add(point);
+        },
         onUnsupportedSegment: () {},
         onError: (code, message) {
           parseError ??= ImportParseException(code, message);

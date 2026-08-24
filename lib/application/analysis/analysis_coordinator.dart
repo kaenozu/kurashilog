@@ -84,11 +84,24 @@ class AnalysisCoordinator {
 
     final stored = await repository.allClusters();
     if (stored.isEmpty) return;
+    // O(V×C) の最近傍計算をメイン isolate 外で実行する。
+    final assignments = await Isolate.run(
+      () => nearestClusterAssignments(visits, stored),
+    );
+    await repository.assignVisitClusterIds(assignments);
+  }
+
+  /// 各訪問に最も近い重心のクラスタ ID を返す（Isolate 実行用の純粋関数）。
+  static Map<int, int> nearestClusterAssignments(
+    List<StoredVisit> visits,
+    List<StoredCluster> clusters,
+  ) {
+    final distance = const DistanceService();
     final assignments = <int, int>{};
     for (final visit in visits) {
-      var best = stored.first;
+      var best = clusters.first;
       var bestDistance = distance.haversineMeters(visit.latLng, best.centroid);
-      for (final cluster in stored.skip(1)) {
+      for (final cluster in clusters.skip(1)) {
         final candidateDistance = distance.haversineMeters(
           visit.latLng,
           cluster.centroid,
@@ -100,7 +113,7 @@ class AnalysisCoordinator {
       }
       assignments[visit.id] = best.id;
     }
-    await repository.assignVisitClusterIds(assignments);
+    return assignments;
   }
 
   Future<void> _rebuildAllSummaries() async {

@@ -264,16 +264,16 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   Future<void> replaceAllClusters(List<StoredCluster> clusters) {
     return _db.transaction(() async {
       final existingRows = await _db.select(_db.placeClusters).get();
-      final existingByKey = {
-        for (final row in existingRows) row.stableKey: row,
-      };
+      // ラベル・プライバシー設定の引き継ぎ先を INSERT 前に確定させる。
+      // exact stableKey を最優先で予約し、残りを未使用の既有行と近接照合
+      // するため、近傍に分割されたクラスタが同じ修正を二重に引き継がない。
+      final inherited = _matchInheritedSettings(existingRows, clusters);
 
       await _db.delete(_db.placeClusters).go();
       if (clusters.isEmpty) return;
 
       final rows = clusters.map((cluster) {
-        var existing = existingByKey[cluster.stableKey];
-        existing ??= _nearestExisting(existingRows, cluster);
+        final match = inherited[cluster.stableKey];
         return _clusterToDb(
           StoredCluster(
             id: cluster.id,
@@ -285,11 +285,11 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
             dwellSeconds: cluster.dwellSeconds,
             firstAt: cluster.firstAt,
             lastAt: cluster.lastAt,
-            labelId: existing?.labelId,
-            excluded: existing?.excluded ?? false,
+            labelId: match?.labelId,
+            excluded: match?.excluded ?? false,
             privacyMode: PlacePrivacyMode.parse(
-              existing?.privacyMode ?? 'visible',
-              legacyExcluded: existing?.excluded ?? false,
+              match?.privacyMode ?? 'visible',
+              legacyExcluded: match?.excluded ?? false,
             ),
           ),
         );
@@ -298,34 +298,60 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
     });
   }
 
+  /// 各再構築クラスタがどの既存行から修正を引き継ぐかを決める排他照合。
+  Map<String, PlaceClusterRow> _matchInheritedSettings(
+    List<PlaceClusterRow> existingRows,
+    List<StoredCluster> rebuilt,
+  ) {
+    final result = <String, PlaceClusterRow>{};
+    final unused = {for (final row in existingRows) row.id: row};
+
+    // Reserve exact matches before proximity matching, so an earlier nearby
+    // split cannot steal the correction from the exact stable-key match.
+    final byStableKey = {for (final row in existingRows) row.stableKey: row};
+    for (final cluster in rebuilt) {
+      final exact = byStableKey[cluster.stableKey];
+      if (exact == null || !unused.containsKey(exact.id)) continue;
+      result[cluster.stableKey] = exact;
+      unused.remove(exact.id);
+    }
+
+    for (final cluster in rebuilt) {
+      if (result.containsKey(cluster.stableKey)) continue;
+      final nearest = _nearestUnused(unused.values, cluster);
+      if (nearest == null) continue;
+      result[cluster.stableKey] = nearest;
+      unused.remove(nearest.id);
+    }
+    return result;
+  }
+
   /// stableKey が変わったクラスタでも、既存クラスタ重心との距離が
   /// クラスタ統合距離（maxMergeDistanceM）以内の最寄りから
   /// ラベル・分析除外設定を引き継ぐ。
-  PlaceClusterRow? _nearestExisting(
-    List<PlaceClusterRow> existingRows,
+  PlaceClusterRow? _nearestUnused(
+    Iterable<PlaceClusterRow> candidates,
     StoredCluster cluster,
   ) {
-    if (existingRows.isEmpty) return null;
+    PlaceClusterRow? best;
+    double? bestDistance;
     final distance = const DistanceService();
-    final maxMatchM = const ClusteringService().maxMergeDistanceM;
     final candidate = LatLngE7(cluster.centroidLatE7, cluster.centroidLngE7);
 
-    var best = existingRows.first;
-    var bestDistance = distance.haversineMeters(
-      candidate,
-      LatLngE7(best.centroidLatE7, best.centroidLngE7),
-    );
-    for (final row in existingRows.skip(1)) {
-      final candidateDistance = distance.haversineMeters(
+    for (final row in candidates) {
+      final rowDistance = distance.haversineMeters(
         candidate,
         LatLngE7(row.centroidLatE7, row.centroidLngE7),
       );
-      if (candidateDistance < bestDistance) {
+      if (bestDistance == null || rowDistance < bestDistance) {
         best = row;
-        bestDistance = candidateDistance;
+        bestDistance = rowDistance;
       }
     }
-    return bestDistance <= maxMatchM ? best : null;
+    if (best == null) return null;
+
+    final maxMatchM = const ClusteringService().maxMergeDistanceM;
+    return bestDistance! <= maxMatchM ? best : null;
   }
 
   @override

@@ -1,5 +1,11 @@
 import 'package:drift/drift.dart';
 
+/// 日時カラムに関する既知の仕様: Drift の既定では DateTime は Unix エポック秒
+/// (INTEGER) として保存され、秒未満は切り捨てられる。重複排除の sourceKey は
+/// パース時にミリ秒精度で算出するため影響しない。テキスト保存モード
+/// (store_date_time_values_as_text) への移行には全日時カラムのマイグレーション
+/// が必要なため、現行スキーマでは既定のまま扱う。
+
 /// 取込単位（設計書 4.1 timeline_imports）。
 @DataClassName('TimelineImportRow')
 class TimelineImports extends Table {

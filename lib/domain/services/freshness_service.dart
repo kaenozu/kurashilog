@@ -55,9 +55,12 @@ class FreshnessService {
   }
 
   /// 日付差（ローカル日ベース）。
+  ///
+  /// DST 遷移で 1 日が 23/25 時間になるのを避けるため、暦日を UTC 換算して
+  /// 差分を取る。
   int _daysBetween(DateTime a, DateTime b) {
-    final da = DateTime(a.year, a.month, a.day);
-    final db = DateTime(b.year, b.month, b.day);
+    final da = DateTime.utc(a.year, a.month, a.day);
+    final db = DateTime.utc(b.year, b.month, b.day);
     return db.difference(da).inDays;
   }
 }

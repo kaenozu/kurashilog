@@ -3,6 +3,8 @@ import 'dart:convert';
 import '../../domain/models/data_quality.dart';
 import '../../domain/models/insight.dart';
 import '../../domain/models/summaries.dart';
+import '../../domain/rules/insight_engine.dart';
+
 import '../../domain/privacy/place_privacy.dart';
 import '../../domain/services/freshness_service.dart';
 import '../../domain/services/summary_service.dart';
@@ -214,7 +216,7 @@ class DashboardUseCase {
       freshness: freshnessResult,
       selectedMonth: month,
       metrics: metrics,
-      insights: insightData.take(5).toList(),
+      insights: insightData.take(InsightEngine.homeMaxInsights).toList(),
       heatmap: heatmap,
       monthly: monthly,
       previousMonthly: previous,

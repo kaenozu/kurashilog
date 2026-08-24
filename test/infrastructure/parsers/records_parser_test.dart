@@ -57,4 +57,32 @@ void main() {
     expect(preview.isOk, isFalse);
     expect(preview.errorCode, 'IMP-003');
   });
+
+  test('legacy locations beyond the buffer limit abort with IMP-006', () async {
+    final points = List.generate(
+      5,
+      (index) =>
+          '{"timestampMs":"${1720000000000 + index * 60000}",'
+          '"latitudeE7":356812360,"longitudeE7":1397671250}',
+    );
+    final json = '{"locations":[${points.join(',')}]}';
+    const parser = RecordsTimelineParser(legacyMaxPoints: 4);
+
+    final preview = await parser.preview(
+      Stream.value(utf8.encode(json)),
+      CancellationToken(),
+    );
+    expect(preview.isOk, isFalse);
+    expect(preview.errorCode, 'IMP-006');
+    expect(preview.errorMessage, contains('上限'));
+
+    await expectLater(
+      parser
+          .parse(Stream.value(utf8.encode(json)), CancellationToken())
+          .toList(),
+      throwsA(
+        isA<ImportParseException>().having((e) => e.code, 'code', 'IMP-006'),
+      ),
+    );
+  });
 }

@@ -1,6 +1,8 @@
 # Import performance and privacy contract
 
-The production import pipeline validates and inserts records in bounded batches of 500 while one database transaction remains open. A parser, validator, database, cancellation, or analysis failure rolls the complete import back; batches are not partial-success boundaries.
+The production import pipeline validates and inserts records in bounded batches of 500 while one database transaction remains open. A parser, validator, database, or cancellation failure rolls record insertion back; batches are not partial-success boundaries.
+
+Analysis (clustering, summaries, insights) runs after that transaction commits, so an analysis failure or crash leaves imported records in place and a retry needs no re-parse: sourceKey deduplication makes re-running the import idempotent.
 
 ## Privacy-safe measurements
 

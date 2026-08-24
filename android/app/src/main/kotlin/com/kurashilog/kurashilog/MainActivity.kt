@@ -3,6 +3,7 @@ package com.kurashilog.kurashilog
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
+import android.os.Bundle
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -34,6 +35,23 @@ class MainActivity : FlutterActivity() {
 
     private var pendingSharedUris = mutableListOf<String>()
     private var pickResult: MethodChannel.Result? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // コールドスタート時に前回の共有受信一時ファイルを掃除する
+        // （再生成時は取り込み中の一時ファイルを消さない）。
+        if (savedInstanceState == null) cleanSharedCacheFiles()
+    }
+
+    private fun cleanSharedCacheFiles() {
+        val prefix = "${SHARE_TAG}_"
+        val files = cacheDir.listFiles() ?: return
+        for (file in files) {
+            if (file.name.startsWith(prefix) && file.name.endsWith(".json")) {
+                file.delete()
+            }
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
