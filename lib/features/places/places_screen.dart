@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/models/persistence_models.dart';
+import '../../domain/privacy/place_privacy.dart';
 import '../../application/providers.dart';
 import '../../shared/widgets.dart';
 
@@ -61,18 +62,20 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final cluster = widget.cluster;
+    final projection = const PlacePrivacyProjector().forApp(cluster);
+    final isExcluded = cluster.excludedFromAnalysis;
 
     return Card(
       child: ListTile(
         enabled: !_busy,
         leading: CircleAvatar(
-          backgroundColor: cluster.excluded
+          backgroundColor: isExcluded
               ? scheme.surfaceContainerHighest
               : scheme.primaryContainer,
           child: Text(
             '${widget.rank}',
             style: TextStyle(
-              color: cluster.excluded
+              color: isExcluded
                   ? scheme.onSurfaceVariant
                   : scheme.onPrimaryContainer,
               fontWeight: FontWeight.w700,
@@ -80,19 +83,22 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
           ),
         ),
         title: Text(
-          cluster.displayName,
-          style: cluster.excluded
+          projection?.displayName ?? '非公開の場所',
+          style: isExcluded
               ? TextStyle(color: theme.colorScheme.onSurfaceVariant)
               : null,
         ),
         subtitle: Text(
           [
-            if (cluster.labelName != null && cluster.labelName!.isNotEmpty)
-              'ラベル: ${cluster.labelName}',
+            if (projection != null &&
+                !projection.nameRedacted &&
+                cluster.labelName != null &&
+                cluster.labelName!.isNotEmpty)
+              'ラベル: ${projection.displayName}',
             '訪問 ${cluster.visitCount} 回',
             '滞在 ${_dwell(cluster.dwellSeconds)}',
             if (cluster.isBasePlace) '基準地点',
-            if (cluster.excluded) '分析除外中',
+            if (isExcluded) '分析除外中',
           ].join(' ・ '),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
@@ -217,9 +223,18 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
   }
 
   Future<void> _openMap(StoredCluster cluster) async {
+    final projection = const PlacePrivacyProjector().forApp(cluster);
+    if (projection == null || projection.mapPoint == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('この地点は地図で表示できません')));
+      }
+      return;
+    }
     final ok = await ref
         .read(externalMapOpenerProvider)
-        .open(cluster.centroid, label: cluster.displayName);
+        .open(projection.mapPoint!, label: projection.displayName);
     if (!ok && mounted) {
       ScaffoldMessenger.of(
         context,
