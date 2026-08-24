@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/design_system.dart';
 import '../../application/providers.dart';
 import '../../application/use_cases/comparison_use_case.dart';
 import '../../domain/models/comparison.dart';
@@ -514,57 +515,77 @@ class _ComparisonResultView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final alignment = comparison.alignment;
+    final qualityLabel = switch (comparison.overallQuality) {
+      ComparisonQuality.comparable => '比較可能',
+      ComparisonQuality.referenceOnly => '参考値',
+      ComparisonQuality.insufficient => '比較不能',
+    };
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('比較結果', style: theme.textTheme.titleMedium),
-                ),
-                _QualityPill(quality: comparison.overallQuality),
-              ],
-            ),
-            const SizedBox(height: 8),
-            _RangeInfo(label: '期間A（実効）', range: alignment.effectiveA),
-            const SizedBox(height: 4),
-            _RangeInfo(label: '期間B（実効）', range: alignment.effectiveB),
-            if (alignment.warnings.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              for (final warning in alignment.warnings)
-                Text(
-                  '・${warningDetail(warning)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-            ],
-            const Divider(height: 24),
-            _CoverageRow(
-              label: '期間A 充足度',
-              range: alignment.effectiveA,
-              coverage: comparison.coverageA,
-            ),
-            _CoverageRow(
-              label: '期間B 充足度',
-              range: alignment.effectiveB,
-              coverage: comparison.coverageB,
-            ),
-            const Divider(height: 24),
-            for (final metric in comparison.metrics) _MetricRow(metric: metric),
-            const SizedBox(height: 12),
-            FilledButton.tonalIcon(
-              onPressed: onSave,
-              icon: const Icon(Icons.bookmark_add_outlined),
-              label: const Text('この比較を保存'),
-            ),
-          ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const JournalSectionHeader(
+          eyebrow: '期間比較',
+          title: '比較のまとめ',
+          supportingText: '実効期間と記録の充足度を確認してから、指標の変化を読み取れます。',
         ),
-      ),
+        const SizedBox(height: KurashilogSpacing.md),
+        JournalCard(
+          kind: JournalCardKind.hero,
+          title: '比較結果',
+          subtitle: qualityLabel,
+          semanticLabel: '比較結果。データ品質は$qualityLabel',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _RangeInfo(label: '期間A（実効）', range: alignment.effectiveA),
+              const SizedBox(height: 4),
+              _RangeInfo(label: '期間B（実効）', range: alignment.effectiveB),
+              const SizedBox(height: KurashilogSpacing.sm),
+              _CoverageRow(
+                label: '期間A 充足度',
+                range: alignment.effectiveA,
+                coverage: comparison.coverageA,
+              ),
+              _CoverageRow(
+                label: '期間B 充足度',
+                range: alignment.effectiveB,
+                coverage: comparison.coverageB,
+              ),
+              if (alignment.warnings.isNotEmpty) ...[
+                const SizedBox(height: KurashilogSpacing.sm),
+                for (final warning in alignment.warnings)
+                  Text(
+                    '・${warningDetail(warning)}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onPrimaryContainer,
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: KurashilogSpacing.lg),
+        const JournalSectionHeader(
+          title: '指標の変化',
+          supportingText: '同じ条件で集計した値と差分です。',
+        ),
+        const SizedBox(height: KurashilogSpacing.sm),
+        for (final metric in comparison.metrics) ...[
+          JournalCard(
+            kind: JournalCardKind.insight,
+            title: metricLabel(metric.id),
+            semanticLabel: '${metricLabel(metric.id)}。期間Aと期間Bの比較',
+            child: _MetricRow(metric: metric),
+          ),
+          const SizedBox(height: KurashilogSpacing.sm),
+        ],
+        FilledButton.tonalIcon(
+          onPressed: onSave,
+          icon: const Icon(Icons.bookmark_add_outlined),
+          label: const Text('この比較を保存'),
+        ),
+      ],
     );
   }
 }
@@ -621,45 +642,6 @@ class _CoverageRow extends StatelessWidget {
   }
 }
 
-class _QualityPill extends StatelessWidget {
-  const _QualityPill({required this.quality});
-
-  final ComparisonQuality quality;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final (bg, fg, label) = switch (quality) {
-      ComparisonQuality.comparable => (
-        scheme.primaryContainer,
-        scheme.onPrimaryContainer,
-        '比較可能',
-      ),
-      ComparisonQuality.referenceOnly => (
-        scheme.secondaryContainer,
-        scheme.onSecondaryContainer,
-        '参考値',
-      ),
-      ComparisonQuality.insufficient => (
-        scheme.errorContainer,
-        scheme.onErrorContainer,
-        '比較不能',
-      ),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: fg),
-      ),
-    );
-  }
-}
-
 class _MetricRow extends StatelessWidget {
   const _MetricRow({required this.metric});
 
@@ -675,8 +657,6 @@ class _MetricRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(metricLabel(metric.id), style: theme.textTheme.titleSmall),
-          const SizedBox(height: 4),
           Row(
             children: [
               Expanded(

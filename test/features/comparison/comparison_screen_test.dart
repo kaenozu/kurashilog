@@ -103,6 +103,8 @@ void main() {
     await tester.tap(find.text('比較する'));
     await tester.pumpAndSettle();
 
+    expect(find.text('比較のまとめ'), findsOneWidget);
+    expect(find.text('指標の変化'), findsOneWidget);
     expect(find.text('比較結果'), findsOneWidget);
     expect(find.text('訪問回数'), findsOneWidget);
     // 今年側の訪問があるので訪問回数メトリックが表示される。
