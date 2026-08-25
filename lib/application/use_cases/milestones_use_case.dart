@@ -70,6 +70,7 @@ class MilestonesUseCase {
   Future<LifeMilestone> createMilestone({
     required ChangePointCandidate candidate,
     required String title,
+    LocalDateRange? range,
     String? note,
   }) async {
     final trimmedTitle = title.trim();
@@ -77,15 +78,18 @@ class MilestonesUseCase {
       throw ArgumentError.value(title, 'title', 'Must not be empty');
     }
     final boundary = candidate.after.startInclusive;
+    final milestoneRange =
+        range ??
+        LocalDateRange(
+          startInclusive: boundary,
+          endExclusive: boundary.addDays(1),
+          timeZoneId: candidate.after.timeZoneId,
+        );
     final now = DateTime.now();
     final milestone = LifeMilestone(
       id: 'milestone-${now.microsecondsSinceEpoch}',
       title: trimmedTitle,
-      range: LocalDateRange(
-        startInclusive: boundary,
-        endExclusive: boundary.addDays(1),
-        timeZoneId: candidate.after.timeZoneId,
-      ),
+      range: milestoneRange,
       createdAt: now,
       note: _cleanOptional(note),
       sourceCandidateKey: candidateKey(candidate),
@@ -171,7 +175,11 @@ class MilestonesUseCase {
     final startLocal = earliest.toLocal();
     final endLocal = latest.toLocal();
     var start = LocalDate(startLocal.year, startLocal.month, startLocal.day);
-    final last = LocalDate(endLocal.year, endLocal.month, endLocal.day).addDays(1);
+    final last = LocalDate(
+      endLocal.year,
+      endLocal.month,
+      endLocal.day,
+    ).addDays(1);
     final timeZoneId = DateTime.now().timeZoneName;
     final snapshots = <LifeWindowSnapshot>[];
 
@@ -244,7 +252,9 @@ class MilestonesUseCase {
         continue;
       }
       recordTemporal(visit.startAtUtc);
-      final cluster = visit.clusterId == null ? null : clusterById[visit.clusterId];
+      final cluster = visit.clusterId == null
+          ? null
+          : clusterById[visit.clusterId];
       if (cluster != null) {
         placeDistribution.update(
           cluster.stableKey,
