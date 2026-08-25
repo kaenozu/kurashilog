@@ -47,6 +47,21 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
   }
 
   @override
+  Future<ImportedFileRecord?> failedImportByHash(String fileHash) async {
+    final rows =
+        await (_db.select(_db.timelineImports)
+              ..where(
+                (table) =>
+                    table.status.equals('failed') &
+                    table.fileHash.equals(fileHash),
+              )
+              ..orderBy([(table) => OrderingTerm.desc(table.id)])
+              ..limit(1))
+            .get();
+    return rows.isEmpty ? null : _importToDomain(rows.first);
+  }
+
+  @override
   Future<int> insertImport(ImportedFileRecord record) =>
       _db.into(_db.timelineImports).insert(_importInsertCompanion(record));
 

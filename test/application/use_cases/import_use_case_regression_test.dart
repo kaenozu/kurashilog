@@ -77,6 +77,62 @@ void main() {
     // コミット済みとして残る（再インポートは sourceKey で冪等）。
     expect(await repository.countVisits(), 1);
   });
+
+  test(
+    'retry after analysis failure rebuilds derived state even when upsert is no-op',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'kurashilog-import-retry-',
+      );
+      final source = File(
+        '${directory.path}${Platform.pathSeparator}timeline.json',
+      );
+      await source.writeAsString('{}');
+
+      final database = AppDatabase(NativeDatabase.memory());
+      final repository = KurashilogRepositoryImpl(database);
+      final analysis = _FailOnceAnalysis(repository: repository);
+      final useCase = ImportUseCase(
+        repository: repository,
+        platform: AppPlatform(),
+        analysis: analysis,
+        parser: const _EmptyParser(),
+        validator: const _StubValidator(),
+      );
+
+      addTearDown(() async {
+        await database.close();
+        await directory.delete(recursive: true);
+      });
+
+      final first = await useCase.importFile(source.path);
+      expect(first.ok, isFalse);
+      expect(first.errorCode, 'IMP-004');
+      expect(await repository.countVisits(), 1);
+      expect(analysis.rebuildCalls, 1);
+
+      final second = await useCase.importFile(source.path);
+      expect(second.ok, isTrue);
+      expect(second.addedVisits, 0);
+      expect(second.updatedVisits, 0);
+      expect(analysis.rebuildCalls, 2);
+      expect(await repository.countVisits(), 1);
+
+      final completed = await repository.completedImportByHash(
+        await _sha256Of(source),
+      );
+      expect(completed, isNotNull);
+      expect(completed!.status, 'completed');
+    },
+  );
+}
+
+Future<String> _sha256Of(File file) async {
+  final hash = DigestSha256();
+  await for (final chunk in file.openRead()) {
+    hash.add(chunk);
+  }
+  return hash.digest();
 }
 
 class _CancellingAnalysis extends AnalysisCoordinator {
@@ -87,6 +143,20 @@ class _CancellingAnalysis extends AnalysisCoordinator {
   @override
   Future<void> rebuildAll() async {
     token.cancel();
+  }
+}
+
+class _FailOnceAnalysis extends AnalysisCoordinator {
+  _FailOnceAnalysis({required super.repository});
+
+  int rebuildCalls = 0;
+
+  @override
+  Future<void> rebuildAll() async {
+    rebuildCalls++;
+    if (rebuildCalls == 1) {
+      throw StateError('synthetic analysis failure');
+    }
   }
 }
 
