@@ -149,7 +149,10 @@ void main() {
 
       final visits = await repository.allVisits();
       expect(visits, hasLength(1));
-      expect(visits.single.endAtUtc, DateTime.utc(2026, 1, 1, 10));
+      expect(
+        visits.single.endAtUtc.isAtSameMomentAs(DateTime.utc(2026, 1, 1, 10)),
+        isTrue,
+      );
     },
   );
 }
