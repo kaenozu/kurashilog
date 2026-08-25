@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../../application/models/persistence_models.dart';
+import '../../application/import/import_reconciliation.dart';
 import '../../application/repositories/kurashilog_repository.dart';
 import '../../domain/change_detection/change_point.dart';
 import '../../domain/models/comparison.dart';
@@ -673,6 +674,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         warningCount: Value(record.warningCount),
         addedVisits: Value(record.addedVisits),
         addedMovements: Value(record.addedMovements),
+        updatedVisits: Value(record.updatedVisits),
+        updatedMovements: Value(record.updatedMovements),
+        reconciliationKind: Value(record.reconciliationKind.name),
+        requiresFullReconciliation: Value(record.requiresFullReconciliation),
       );
 
   TimelineImportsCompanion _importUpdateCompanion(ImportedFileRecord record) =>
@@ -687,6 +692,10 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         warningCount: Value(record.warningCount),
         addedVisits: Value(record.addedVisits),
         addedMovements: Value(record.addedMovements),
+        updatedVisits: Value(record.updatedVisits),
+        updatedMovements: Value(record.updatedMovements),
+        reconciliationKind: Value(record.reconciliationKind.name),
+        requiresFullReconciliation: Value(record.requiresFullReconciliation),
       );
 
   ImportedFileRecord _importToDomain(TimelineImportRow row) =>
@@ -702,6 +711,13 @@ class KurashilogRepositoryImpl implements KurashilogRepository {
         warningCount: row.warningCount,
         addedVisits: row.addedVisits,
         addedMovements: row.addedMovements,
+        updatedVisits: row.updatedVisits,
+        updatedMovements: row.updatedMovements,
+        reconciliationKind: ImportReconciliationKind.values.firstWhere(
+          (kind) => kind.name == row.reconciliationKind,
+          orElse: () => ImportReconciliationKind.noChanges,
+        ),
+        requiresFullReconciliation: row.requiresFullReconciliation,
       );
 
   VisitsCompanion _visitToDb(StoredVisit visit) => VisitsCompanion.insert(

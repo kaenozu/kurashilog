@@ -4,6 +4,7 @@ library;
 import '../../domain/models/distance_method.dart';
 import '../../domain/models/lat_lng.dart';
 import '../../domain/models/summaries.dart';
+import '../import/import_reconciliation.dart';
 
 class StoredVisit {
   const StoredVisit({
@@ -199,6 +200,10 @@ class ImportedFileRecord {
     this.warningCount = 0,
     this.addedVisits = 0,
     this.addedMovements = 0,
+    this.updatedVisits = 0,
+    this.updatedMovements = 0,
+    this.reconciliationKind = ImportReconciliationKind.noChanges,
+    this.requiresFullReconciliation = false,
   });
 
   final int id;
@@ -212,6 +217,10 @@ class ImportedFileRecord {
   final int warningCount;
   final int addedVisits;
   final int addedMovements;
+  final int updatedVisits;
+  final int updatedMovements;
+  final ImportReconciliationKind reconciliationKind;
+  final bool requiresFullReconciliation;
 
   bool get isCompleted => status == 'completed';
 }
