@@ -30,8 +30,11 @@ class PlacesScreen extends ConsumerWidget {
           return ListView.builder(
             padding: const EdgeInsets.all(12),
             itemCount: clusters.length,
-            itemBuilder: (context, i) =>
-                _PlaceTile(cluster: clusters[i], rank: i + 1),
+            itemBuilder: (context, i) => _PlaceTile(
+              cluster: clusters[i],
+              rank: i + 1,
+              allClusters: clusters,
+            ),
           );
         },
       ),
@@ -45,10 +48,15 @@ final _placesProvider = FutureProvider.autoDispose<List<StoredCluster>>((ref) {
 });
 
 class _PlaceTile extends ConsumerStatefulWidget {
-  const _PlaceTile({required this.cluster, required this.rank});
+  const _PlaceTile({
+    required this.cluster,
+    required this.rank,
+    required this.allClusters,
+  });
 
   final StoredCluster cluster;
   final int rank;
+  final List<StoredCluster> allClusters;
 
   @override
   ConsumerState<_PlaceTile> createState() => _PlaceTileState();
@@ -64,6 +72,21 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
     final cluster = widget.cluster;
     final projection = const PlacePrivacyProjector().forApp(cluster);
     final isExcluded = cluster.excludedFromAnalysis;
+    final mergedMembers = cluster.labelId == null
+        ? const <StoredCluster>[]
+        : widget.allClusters
+              .where((candidate) => candidate.labelId == cluster.labelId)
+              .toList(growable: false);
+    final isMerged = mergedMembers.length > 1;
+    final mergeCandidates = widget.allClusters
+        .where(
+          (candidate) =>
+              candidate.id != cluster.id &&
+              !candidate.excludedFromAnalysis &&
+              candidate.privacyMode == cluster.privacyMode &&
+              candidate.labelId != cluster.labelId,
+        )
+        .toList(growable: false);
 
     return Card(
       child: ListTile(
@@ -100,6 +123,7 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
             if (cluster.category != null && !projectionNameHidden(cluster))
               _categoryLabel(cluster.category!),
             if (cluster.isBasePlace) '基準地点',
+            if (isMerged) '同じ場所として${mergedMembers.length}地点を統合',
             _privacySummary(cluster.privacyMode),
           ].where((value) => value.isNotEmpty).join(' ・ '),
           maxLines: 3,
@@ -115,14 +139,22 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
                 await _editLabel(cluster);
               case 'privacy':
                 await _editPrivacy(cluster);
+              case 'merge':
+                await _mergePlace(cluster, mergeCandidates);
+              case 'split':
+                await _splitPlace(cluster);
               case 'map':
                 await _openMap(cluster);
             }
           },
-          itemBuilder: (_) => const [
-            PopupMenuItem(value: 'label', child: Text('名前・カテゴリを編集')),
-            PopupMenuItem(value: 'privacy', child: Text('プライバシー設定')),
-            PopupMenuItem(value: 'map', child: Text('地図で開く')),
+          itemBuilder: (_) => [
+            const PopupMenuItem(value: 'label', child: Text('名前・カテゴリを編集')),
+            const PopupMenuItem(value: 'privacy', child: Text('プライバシー設定')),
+            if (mergeCandidates.isNotEmpty)
+              const PopupMenuItem(value: 'merge', child: Text('同じ場所として統合')),
+            if (isMerged)
+              const PopupMenuItem(value: 'split', child: Text('統合を解除')),
+            const PopupMenuItem(value: 'map', child: Text('地図で開く')),
           ],
         ),
       ),
@@ -286,6 +318,96 @@ class _PlaceTileState extends ConsumerState<_PlaceTile> {
     await _runBusy(
       () => ref.read(placesUseCaseProvider).setPrivacyMode(cluster.id, result),
     );
+  }
+
+  Future<void> _mergePlace(
+    StoredCluster cluster,
+    List<StoredCluster> candidates,
+  ) async {
+    if (candidates.isEmpty) return;
+    final targetId = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('同じ場所として統合'),
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(24, 0, 24, 8),
+            child: Text('同じ場所だと確認できる地点を選んでください。'),
+          ),
+          for (final candidate in candidates)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(candidate.id),
+              child: Text(
+                '${candidate.displayName} ・ 訪問 ${candidate.visitCount} 回',
+              ),
+            ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('キャンセル'),
+          ),
+        ],
+      ),
+    );
+    if (targetId == null || !mounted) return;
+    final target = candidates.firstWhere(
+      (candidate) => candidate.id == targetId,
+    );
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('地点を統合しますか？'),
+        content: Text(
+          '「${cluster.displayName}」と「${target.displayName}」を同じ場所として集計します。後から解除できます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('戻る'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('統合する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runBusy(() async {
+      final changed = await ref
+          .read(placesUseCaseProvider)
+          .mergePlaces(
+            primaryClusterId: cluster.id,
+            secondaryClusterId: target.id,
+          );
+      if (!changed) throw StateError('place merge rejected');
+    });
+  }
+
+  Future<void> _splitPlace(StoredCluster cluster) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('統合を解除しますか？'),
+        content: const Text('この地点だけを別の場所として集計する状態へ戻します。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('キャンセル'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('解除する'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _runBusy(() async {
+      final changed = await ref
+          .read(placesUseCaseProvider)
+          .splitPlace(cluster.id);
+      if (!changed) throw StateError('place split rejected');
+    });
   }
 
   Future<void> _runBusy(Future<void> Function() action) async {

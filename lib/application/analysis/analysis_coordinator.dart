@@ -116,6 +116,27 @@ class AnalysisCoordinator {
     return assignments;
   }
 
+  /// Manual place merges share a labelId. Normalize all member clusters to
+  /// the smallest concrete cluster id so summaries/evidence keep valid cluster
+  /// references while counting the user-confirmed place only once.
+  static Map<int, int> effectivePlaceIds(List<StoredCluster> clusters) {
+    final primaryByLabel = <int, int>{};
+    for (final cluster in clusters) {
+      final labelId = cluster.labelId;
+      if (labelId == null) continue;
+      final current = primaryByLabel[labelId];
+      if (current == null || cluster.id < current) {
+        primaryByLabel[labelId] = cluster.id;
+      }
+    }
+    return <int, int>{
+      for (final cluster in clusters)
+        cluster.id: cluster.labelId == null
+            ? cluster.id
+            : primaryByLabel[cluster.labelId!]!,
+    };
+  }
+
   Future<void> _rebuildAllSummaries() async {
     final earliest = await repository.earliestActivityAt();
     final latest = await repository.latestActivityAt();
@@ -153,8 +174,9 @@ class AnalysisCoordinator {
 
     final labels = await repository.allLabels();
     final clusters = await repository.allClusters();
+    final effectivePlaceIdByClusterId = effectivePlaceIds(clusters);
     final excludedIds = clusters
-        .where((cluster) => cluster.excluded)
+        .where((cluster) => cluster.excludedFromAnalysis)
         .map((c) => c.id)
         .toSet();
     final baseLabel = labels.where((label) => label.isBasePlace).firstOrNull;
@@ -163,6 +185,9 @@ class AnalysisCoordinator {
         : clusters
               .where((cluster) => cluster.labelId == baseLabel.id)
               .firstOrNull;
+    final baseEffectivePlaceId = baseCluster == null
+        ? null
+        : effectivePlaceIdByClusterId[baseCluster.id];
 
     final visitsByDate = <String, List<StoredVisit>>{};
     for (final visit in visits) {
@@ -199,20 +224,22 @@ class AnalysisCoordinator {
       daily.add(
         summaries.computeDaily(
           localDate: date,
-          visits: dayVisits
-              .map(
-                (visit) => DailyVisitInput(
-                  startAtUtc: visit.startAtUtc,
-                  endAtUtc: visit.endAtUtc,
-                  clusterId: visit.clusterId,
-                  excluded:
-                      visit.clusterId != null &&
-                      excludedIds.contains(visit.clusterId),
-                  outsideBasePlace:
-                      baseCluster != null && visit.clusterId != baseCluster.id,
-                ),
-              )
-              .toList(),
+          visits: dayVisits.map((visit) {
+            final rawClusterId = visit.clusterId;
+            final effectiveClusterId = rawClusterId == null
+                ? null
+                : effectivePlaceIdByClusterId[rawClusterId] ?? rawClusterId;
+            return DailyVisitInput(
+              startAtUtc: visit.startAtUtc,
+              endAtUtc: visit.endAtUtc,
+              clusterId: effectiveClusterId,
+              excluded:
+                  rawClusterId != null && excludedIds.contains(rawClusterId),
+              outsideBasePlace:
+                  baseEffectivePlaceId != null &&
+                  effectiveClusterId != baseEffectivePlaceId,
+            );
+          }).toList(),
           movements: dayMovements
               .map(
                 (movement) => DailyMovementInput(
@@ -347,8 +374,9 @@ class AnalysisCoordinator {
     );
 
     final clusters = await repository.allClusters();
+    final effectivePlaceIdByClusterId = effectivePlaceIds(clusters);
     final excludedIds = clusters
-        .where((cluster) => cluster.excluded)
+        .where((cluster) => cluster.excludedFromAnalysis)
         .map((c) => c.id)
         .toSet();
     final labels = await repository.allLabels();
@@ -358,6 +386,14 @@ class AnalysisCoordinator {
         : clusters
               .where((cluster) => cluster.labelId == baseLabel.id)
               .firstOrNull;
+    final baseEffectivePlaceId = baseCluster == null
+        ? null
+        : effectivePlaceIdByClusterId[baseCluster.id];
+    final representativeByEffectiveId = <int, StoredCluster>{};
+    for (final cluster in clusters) {
+      final effectiveId = effectivePlaceIdByClusterId[cluster.id] ?? cluster.id;
+      representativeByEffectiveId.putIfAbsent(effectiveId, () => cluster);
+    }
 
     int sumDistance(List<StoredMovement> values) => values
         .where(
@@ -368,8 +404,9 @@ class AnalysisCoordinator {
     Map<int, int> clusterCounts(List<StoredVisit> values) {
       final result = <int, int>{};
       for (final visit in values) {
-        final id = visit.clusterId;
-        if (id == null || excludedIds.contains(id)) continue;
+        final rawId = visit.clusterId;
+        if (rawId == null || excludedIds.contains(rawId)) continue;
+        final id = effectivePlaceIdByClusterId[rawId] ?? rawId;
         result[id] = (result[id] ?? 0) + 1;
       }
       return result;
@@ -386,8 +423,12 @@ class AnalysisCoordinator {
       final perDay = <String, int>{};
       for (final visit in values) {
         final local = visit.startAtUtc.toLocal();
+        final rawId = visit.clusterId;
+        final effectiveId = rawId == null
+            ? null
+            : effectivePlaceIdByClusterId[rawId] ?? rawId;
         if (local.weekday > DateTime.friday ||
-            visit.clusterId != baseCluster.id) {
+            effectiveId != baseEffectivePlaceId) {
           continue;
         }
         final key = SummaryService.localDateOf(local);
@@ -408,9 +449,13 @@ class AnalysisCoordinator {
         final holiday =
             local.weekday == DateTime.saturday ||
             local.weekday == DateTime.sunday;
+        final rawId = visit.clusterId;
+        final effectiveId = rawId == null
+            ? null
+            : effectivePlaceIdByClusterId[rawId] ?? rawId;
         if (!holiday ||
-            visit.clusterId == baseCluster.id ||
-            excludedIds.contains(visit.clusterId)) {
+            effectiveId == baseEffectivePlaceId ||
+            excludedIds.contains(rawId)) {
           continue;
         }
         distances.add(
@@ -444,15 +489,16 @@ class AnalysisCoordinator {
       newClusterCount: newClusters,
       currentClusterVisits: currentCounts,
       previousClusterVisits: previousCounts,
-      baseClusterId: baseCluster?.id,
+      baseClusterId: baseEffectivePlaceId,
       baseCentroidLatE7: baseCluster?.centroidLatE7,
       baseCentroidLngE7: baseCluster?.centroidLngE7,
       clusterCentroids: {
-        for (final cluster in clusters)
-          cluster.id: (cluster.centroidLatE7, cluster.centroidLngE7),
+        for (final entry in representativeByEffectiveId.entries)
+          entry.key: (entry.value.centroidLatE7, entry.value.centroidLngE7),
       },
       clusterNames: {
-        for (final cluster in clusters) cluster.id: cluster.displayName,
+        for (final entry in representativeByEffectiveId.entries)
+          entry.key: entry.value.displayName,
       },
       currentWeekdayReturnMinutes: medianReturn(currentVisits),
       previousWeekdayReturnMinutes: medianReturn(previousVisits),
