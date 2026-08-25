@@ -173,6 +173,8 @@ void main() {
 
       await tester.tap(find.text('今年と去年（経過日数一致）'));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('比較する'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('比較する'));
       await tester.pumpAndSettle();
 
