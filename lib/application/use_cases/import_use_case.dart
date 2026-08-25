@@ -203,6 +203,7 @@ class ImportUseCase {
         sourceMaxAt: completed.sourceMaxAt,
       );
     }
+    final failedPreviousAttempt = await repository.failedImportByHash(fileHash);
 
     // Capture the watermark before applying this import. It is used only for
     // conservative classification; it does not authorize deletion, which
@@ -305,18 +306,14 @@ class ImportUseCase {
         throw const ImportParseException('IMP-005', 'キャンセルされました');
       }
 
-      // Source corrections change the same derived surfaces as additions.
       // A previous attempt may also have committed source-owned rows and then
       // failed during analysis. In that retry, sourceKey upsert reports zero
-      // delta even though derived state still needs repair. Because an exact
-      // completed file hash returned above, any non-empty import reaching this
-      // point is safe to rebuild: it is either a material delta or recovery of
-      // an incomplete/overlapping import.
+      // delta even though derived state still needs repair. Only that explicit
+      // failed-attempt marker permits a zero-delta rebuild; a different
+      // overlapping export with no material delta is a true no-op.
       final changedRecordCount =
           addedVisits + addedMovements + updatedVisits + updatedMovements;
-      final hasValidatedSourceRecords =
-          sourceMinAt != null || sourceMaxAt != null;
-      if (changedRecordCount > 0 || hasValidatedSourceRecords) {
+      if (changedRecordCount > 0 || failedPreviousAttempt != null) {
         onProgress?.call(
           const ImportProgress(ImportStage.clustering, percent: 75),
         );

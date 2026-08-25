@@ -8,6 +8,7 @@ abstract interface class KurashilogRepository {
 
   Future<ImportedFileRecord?> latestCompletedImport();
   Future<ImportedFileRecord?> completedImportByHash(String fileHash);
+  Future<ImportedFileRecord?> failedImportByHash(String fileHash);
   Future<int> insertImport(ImportedFileRecord record);
   Future<void> updateImport(ImportedFileRecord record);
 
