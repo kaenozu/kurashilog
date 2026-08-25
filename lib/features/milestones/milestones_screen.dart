@@ -21,9 +21,7 @@ class MilestonesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('生活の変化・節目')),
       body: review.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => const Center(
-          child: Text('読み込みに失敗しました。もう一度お試しください。'),
-        ),
+        error: (_, _) => const Center(child: Text('読み込みに失敗しました。もう一度お試しください。')),
         data: (data) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(milestoneReviewProvider);
