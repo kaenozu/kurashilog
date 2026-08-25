@@ -58,9 +58,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> seedLargeComparisonData(
-    KurashilogRepository repository,
-  ) async {
+  Future<void> seedLargeComparisonData(KurashilogRepository repository) async {
     final now = DateTime.now();
     final visits = <StoredVisit>[];
     var id = 0;
@@ -98,21 +96,13 @@ void main() {
         size: const Size(360, 800),
         themeMode: ThemeMode.light,
       ),
-      (
-        name: '360 dark',
-        size: const Size(360, 800),
-        themeMode: ThemeMode.dark,
-      ),
+      (name: '360 dark', size: const Size(360, 800), themeMode: ThemeMode.dark),
       (
         name: '412 light',
         size: const Size(412, 915),
         themeMode: ThemeMode.light,
       ),
-      (
-        name: '412 dark',
-        size: const Size(412, 915),
-        themeMode: ThemeMode.dark,
-      ),
+      (name: '412 dark', size: const Size(412, 915), themeMode: ThemeMode.dark),
       (
         name: 'tablet light',
         size: const Size(800, 1280),
