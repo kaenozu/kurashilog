@@ -1,0 +1,36 @@
+name: Apply issue21 effective-place patch
+
+on:
+  push:
+    branches:
+      - agent/21-place-merge-split
+    paths:
+      - '.github/scripts/patch_issue21_effective_places.py'
+      - '.github/workflows/apply-issue21-effective-places.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/21-place-merge-split
+      - run: python3 .github/scripts/patch_issue21_effective_places.py
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - run: dart format lib/application/analysis/analysis_coordinator.dart
+      - name: Commit patch and remove helper
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/application/analysis/analysis_coordinator.dart
+          git rm .github/scripts/patch_issue21_effective_places.py .github/workflows/apply-issue21-effective-places.yml
+          git commit -m 'feat: normalize merged places in analysis'
+          git push origin HEAD:agent/21-place-merge-split
