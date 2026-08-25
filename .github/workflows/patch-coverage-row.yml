@@ -1,0 +1,85 @@
+name: Patch coverage row
+
+on:
+  push:
+    branches:
+      - agent/20-responsive-accessibility-matrix
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/20-responsive-accessibility-matrix
+      - name: Apply responsive coverage-row patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('lib/features/comparison/comparison_screen.dart')
+          text = path.read_text()
+          old = """    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
+          Text(
+            '${coverage.representedDays}/${range.calendarDays}日 '
+            '（${(ratio * 100).round()}%）',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+"""
+          new = """    final labelText = Text(label, style: theme.textTheme.bodyMedium);
+    final coverageText = Text(
+      '${coverage.representedDays}/${range.calendarDays}日 '
+      '（${(ratio * 100).round()}%）',
+      textAlign: TextAlign.end,
+      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+    );
+    final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: largeText
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                labelText,
+                const SizedBox(height: 4),
+                Align(alignment: Alignment.centerRight, child: coverageText),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: labelText),
+                const SizedBox(width: 8),
+                coverageText,
+              ],
+            ),
+    );
+"""
+          if old not in text:
+              raise SystemExit('expected coverage-row snippet not found')
+          path.write_text(text.replace(old, new, 1))
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - run: dart format lib/features/comparison/comparison_screen.dart
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add lib/features/comparison/comparison_screen.dart
+          git commit -m 'fix: stack comparison coverage at large text scales'
+          git push origin HEAD:agent/20-responsive-accessibility-matrix
