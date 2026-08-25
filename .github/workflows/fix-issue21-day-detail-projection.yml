@@ -1,0 +1,36 @@
+name: Fix issue21 day-detail projection
+
+on:
+  push:
+    branches:
+      - agent/21-insight-evidence-drilldown
+    paths:
+      - '.github/scripts/fix_issue21_day_detail_projection.py'
+      - '.github/workflows/fix-issue21-day-detail-projection.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/21-insight-evidence-drilldown
+      - run: python3 .github/scripts/fix_issue21_day_detail_projection.py
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - run: dart format lib/application/use_cases/dashboard_use_case.dart
+      - name: Commit fix and remove helper
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/application/use_cases/dashboard_use_case.dart
+          git rm .github/scripts/fix_issue21_day_detail_projection.py .github/workflows/fix-issue21-day-detail-projection.yml
+          git commit -m 'fix: apply day-detail privacy projection'
+          git push origin HEAD:agent/21-insight-evidence-drilldown
