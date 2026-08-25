@@ -3,101 +3,139 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kurashilog/application/models/persistence_models.dart';
 import 'package:kurashilog/application/use_cases/milestones_use_case.dart';
+import 'package:kurashilog/domain/change_detection/change_point.dart';
 import 'package:kurashilog/domain/models/comparison.dart';
 import 'package:kurashilog/features/milestones/milestones_screen.dart';
 import 'package:kurashilog/infrastructure/database/app_database.dart';
 import 'package:kurashilog/infrastructure/database/kurashilog_repository_impl.dart';
 
 void main() {
-  test('detects a durable synthetic change and supports ignore/milestone handoff', () async {
-    final database = AppDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = KurashilogRepositoryImpl(database);
-    await _seedDurableChange(repository);
-    final useCase = MilestonesUseCase(repository: repository);
+  test(
+    'detects a durable synthetic change and supports ignore/milestone handoff',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = KurashilogRepositoryImpl(database);
+      await _seedDurableChange(repository);
+      final useCase = MilestonesUseCase(repository: repository);
 
-    final initial = await useCase.loadReview();
-    expect(initial.candidates, hasLength(1));
-    final candidate = initial.candidates.single;
-    expect(candidate.evidence.first.description, contains('場所'));
+      final initial = await useCase.loadReview();
+      expect(initial.candidates, hasLength(1));
+      final candidate = initial.candidates.single;
+      expect(candidate.evidence.first.description, contains('場所'));
 
-    final milestone = await useCase.createMilestone(
-      candidate: candidate,
-      title: '生活リズムの節目',
-      note: '自分で確認したメモ',
-    );
-    final request = useCase.comparisonRequestForMilestone(milestone);
-    expect(request.alignment, ComparisonAlignment.milestone);
-    expect(request.periodA.calendarDays, 28);
-    expect(request.periodB.calendarDays, 28);
-    expect(request.periodA.endExclusive, request.periodB.startInclusive);
+      final customRange = LocalDateRange(
+        startInclusive: candidate.after.startInclusive,
+        endExclusive: candidate.after.startInclusive.addDays(3),
+        timeZoneId: candidate.after.timeZoneId,
+      );
+      final milestone = await useCase.createMilestone(
+        candidate: candidate,
+        title: '生活リズムの節目',
+        range: customRange,
+        note: '自分で確認したメモ',
+      );
+      expect(milestone.range, customRange);
 
-    await useCase.ignoreCandidate(candidate);
-    final afterIgnore = await useCase.loadReview();
-    expect(afterIgnore.candidates, isEmpty);
-    expect(afterIgnore.milestones, hasLength(1));
-    expect(afterIgnore.milestones.single.title, '生活リズムの節目');
+      final request = useCase.comparisonRequestForMilestone(milestone);
+      expect(request.alignment, ComparisonAlignment.milestone);
+      expect(request.periodA.calendarDays, 28);
+      expect(request.periodB.calendarDays, 28);
+      expect(request.periodA.endExclusive, request.periodB.startInclusive);
 
-    final editedRange = LocalDateRange(
-      startInclusive: milestone.range.startInclusive.addDays(1),
-      endExclusive: milestone.range.endExclusive.addDays(2),
-      timeZoneId: milestone.range.timeZoneId,
-    );
-    await useCase.updateMilestone(
-      milestone: milestone,
-      title: '編集した節目',
-      range: editedRange,
-      note: null,
-    );
-    final edited = (await repository.allMilestones()).single;
-    expect(edited.title, '編集した節目');
-    expect(edited.range, editedRange);
-    expect(edited.note, isNull);
-    expect(edited.sourceCandidateKey, milestone.sourceCandidateKey);
+      await useCase.ignoreCandidate(candidate);
+      final afterIgnore = await useCase.loadReview();
+      expect(afterIgnore.candidates, isEmpty);
+      expect(afterIgnore.milestones, hasLength(1));
+      expect(afterIgnore.milestones.single.title, '生活リズムの節目');
 
-    await useCase.deleteMilestone(milestone.id);
-    expect(await repository.allMilestones(), isEmpty);
-  });
+      final editedRange = LocalDateRange(
+        startInclusive: milestone.range.startInclusive.addDays(1),
+        endExclusive: milestone.range.endExclusive.addDays(2),
+        timeZoneId: milestone.range.timeZoneId,
+      );
+      await useCase.updateMilestone(
+        milestone: milestone,
+        title: '編集した節目',
+        range: editedRange,
+        note: null,
+      );
+      final edited = (await repository.allMilestones()).single;
+      expect(edited.title, '編集した節目');
+      expect(edited.range, editedRange);
+      expect(edited.note, isNull);
+      expect(edited.sourceCandidateKey, milestone.sourceCandidateKey);
 
-  testWidgets('candidate card remains operable at 200% text on a small screen', (
+      await useCase.deleteMilestone(milestone.id);
+      expect(await repository.allMilestones(), isEmpty);
+    },
+  );
+
+  testWidgets(
+    'candidate card remains operable at 200% text on a small screen',
+    (tester) async {
+      final candidate = await _candidateFromSyntheticData();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(360, 800),
+              textScaler: TextScaler.linear(2),
+            ),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: ChangeCandidateCard(
+                  candidate: candidate,
+                  onCreateMilestone: () {},
+                  onIgnore: () {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(find.textContaining('確率ではありません'), findsOneWidget);
+      expect(find.text('節目として記録'), findsOneWidget);
+      expect(find.text('今回は無視'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('milestone editor enables save after entering a title', (
     tester,
   ) async {
-    final rangeA = LocalDateRange(
+    final range = LocalDateRange(
       startInclusive: LocalDate(2026, 1, 1),
-      endExclusive: LocalDate(2026, 1, 29),
+      endExclusive: LocalDate(2026, 1, 2),
       timeZoneId: 'Asia/Tokyo',
     );
-    final rangeB = LocalDateRange(
-      startInclusive: LocalDate(2026, 1, 29),
-      endExclusive: LocalDate(2026, 2, 26),
-      timeZoneId: 'Asia/Tokyo',
-    );
-    final candidate = (await _candidateFromSyntheticRanges(rangeA, rangeB));
-
     await tester.pumpWidget(
       MaterialApp(
-        home: MediaQuery(
-          data: const MediaQueryData(
-            size: Size(360, 800),
-            textScaler: TextScaler.linear(2),
-          ),
-          child: Scaffold(
-            body: SingleChildScrollView(
-              child: ChangeCandidateCard(
-                candidate: candidate,
-                onCreateMilestone: () {},
-                onIgnore: () {},
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => TextButton(
+              onPressed: () => showDialog<MilestoneEditorResult>(
+                context: context,
+                builder: (_) => MilestoneEditorDialog(initialRange: range),
               ),
+              child: const Text('open'),
             ),
           ),
         ),
       ),
     );
 
-    expect(find.textContaining('確率ではありません'), findsOneWidget);
-    expect(find.text('節目として記録'), findsOneWidget);
-    expect(find.text('今回は無視'), findsOneWidget);
-    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    FilledButton saveButton = tester.widget(find.widgetWithText(FilledButton, '保存'));
+    expect(saveButton.onPressed, isNull);
+
+    await tester.enterText(find.byType(TextField).first, '新しい節目');
+    await tester.pump();
+    saveButton = tester.widget(find.widgetWithText(FilledButton, '保存'));
+    expect(saveButton.onPressed, isNotNull);
   });
 }
 
@@ -150,10 +188,7 @@ Future<void> _seedDurableChange(KurashilogRepositoryImpl repository) async {
   await repository.insertNewRecords(visits: visits, movements: const []);
 }
 
-Future<dynamic> _candidateFromSyntheticRanges(
-  LocalDateRange rangeA,
-  LocalDateRange rangeB,
-) async {
+Future<ChangePointCandidate> _candidateFromSyntheticData() async {
   final database = AppDatabase(NativeDatabase.memory());
   final repository = KurashilogRepositoryImpl(database);
   try {
