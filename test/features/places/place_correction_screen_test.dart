@@ -23,7 +23,7 @@ void main() {
     return (container: container, repository: repository);
   }
 
-  StoredCluster cluster({PlacePrivacyMode mode = PlacePrivacyMode.visible}) {
+  StoredCluster cluster() {
     final now = DateTime.utc(2026, 8, 1);
     return StoredCluster(
       id: 1,
@@ -35,17 +35,34 @@ void main() {
       dwellSeconds: 7200,
       firstAt: now,
       lastAt: now.add(const Duration(days: 10)),
-      privacyMode: mode,
-      labelName: 'テスト地点',
-      category: 'leisure',
     );
+  }
+
+  Future<void> seedLabeledCluster(
+    KurashilogRepositoryImpl repository, {
+    PlacePrivacyMode privacyMode = PlacePrivacyMode.visible,
+  }) async {
+    await repository.replaceAllClusters([cluster()]);
+    final now = DateTime.utc(2026, 8, 12);
+    final labelId = await repository.insertLabel(
+      StoredLabel(
+        id: 0,
+        displayName: 'テスト地点',
+        category: 'leisure',
+        isBasePlace: false,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    await repository.updateClusterLabel(1, labelId);
+    await repository.setClusterPrivacyMode(1, privacyMode);
   }
 
   testWidgets(
     'privacy dialog persists hide-name and refreshes safe projection',
     (tester) async {
       final setup = await makeContainer();
-      await setup.repository.replaceAllClusters([cluster()]);
+      await seedLabeledCluster(setup.repository);
 
       await tester.pumpWidget(
         UncontrolledProviderScope(
@@ -79,9 +96,10 @@ void main() {
     tester,
   ) async {
     final setup = await makeContainer();
-    await setup.repository.replaceAllClusters([
-      cluster(mode: PlacePrivacyMode.exclude),
-    ]);
+    await seedLabeledCluster(
+      setup.repository,
+      privacyMode: PlacePrivacyMode.exclude,
+    );
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
