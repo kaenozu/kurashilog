@@ -43,7 +43,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -61,10 +61,42 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) {
         await m.createTable(userMilestones);
       }
+      if (from < 4) {
+        await _addTimelineImportColumnIfMissing(
+          'updated_visits',
+          'INTEGER NOT NULL DEFAULT 0',
+        );
+        await _addTimelineImportColumnIfMissing(
+          'updated_movements',
+          'INTEGER NOT NULL DEFAULT 0',
+        );
+        await _addTimelineImportColumnIfMissing(
+          'reconciliation_kind',
+          "TEXT NOT NULL DEFAULT 'noChanges'",
+        );
+        await _addTimelineImportColumnIfMissing(
+          'requires_full_reconciliation',
+          'INTEGER NOT NULL DEFAULT 0',
+        );
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA journal_mode = wal;');
       await customStatement('PRAGMA synchronous = normal;');
     },
   );
+
+  Future<void> _addTimelineImportColumnIfMissing(
+    String name,
+    String definition,
+  ) async {
+    final columns = await customSelect(
+      'PRAGMA table_info(timeline_imports)',
+    ).get();
+    if (!columns.any((row) => row.data['name'] == name)) {
+      await customStatement(
+        'ALTER TABLE timeline_imports ADD COLUMN $name $definition',
+      );
+    }
+  }
 }

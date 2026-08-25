@@ -20,6 +20,12 @@ class TimelineImports extends Table {
   IntColumn get warningCount => integer().withDefault(const Constant(0))();
   IntColumn get addedVisits => integer().withDefault(const Constant(0))();
   IntColumn get addedMovements => integer().withDefault(const Constant(0))();
+  IntColumn get updatedVisits => integer().withDefault(const Constant(0))();
+  IntColumn get updatedMovements => integer().withDefault(const Constant(0))();
+  TextColumn get reconciliationKind =>
+      text().withDefault(const Constant('noChanges'))();
+  BoolColumn get requiresFullReconciliation =>
+      boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('VisitRow')

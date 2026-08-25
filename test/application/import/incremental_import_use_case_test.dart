@@ -147,6 +147,13 @@ void main() {
       expect(second.reconciliation.requiresFullReconciliation, isTrue);
       expect(analysis.rebuildCount, 2);
 
+      final persisted = await repository.latestCompletedImport();
+      expect(persisted, isNotNull);
+      expect(persisted!.updatedVisits, 1);
+      expect(persisted.updatedMovements, 0);
+      expect(persisted.reconciliationKind, ImportReconciliationKind.overlap);
+      expect(persisted.requiresFullReconciliation, isTrue);
+
       final visits = await repository.allVisits();
       expect(visits, hasLength(1));
       expect(

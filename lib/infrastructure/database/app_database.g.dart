@@ -133,6 +133,57 @@ class $TimelineImportsTable extends TimelineImports
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _updatedVisitsMeta = const VerificationMeta(
+    'updatedVisits',
+  );
+  @override
+  late final GeneratedColumn<int> updatedVisits = GeneratedColumn<int>(
+    'updated_visits',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _updatedMovementsMeta = const VerificationMeta(
+    'updatedMovements',
+  );
+  @override
+  late final GeneratedColumn<int> updatedMovements = GeneratedColumn<int>(
+    'updated_movements',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _reconciliationKindMeta =
+      const VerificationMeta('reconciliationKind');
+  @override
+  late final GeneratedColumn<String> reconciliationKind =
+      GeneratedColumn<String>(
+        'reconciliation_kind',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('noChanges'),
+      );
+  static const VerificationMeta _requiresFullReconciliationMeta =
+      const VerificationMeta('requiresFullReconciliation');
+  @override
+  late final GeneratedColumn<bool> requiresFullReconciliation =
+      GeneratedColumn<bool>(
+        'requires_full_reconciliation',
+        aliasedName,
+        false,
+        type: DriftSqlType.bool,
+        requiredDuringInsert: false,
+        defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("requires_full_reconciliation" IN (0, 1))',
+        ),
+        defaultValue: const Constant(false),
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -146,6 +197,10 @@ class $TimelineImportsTable extends TimelineImports
     warningCount,
     addedVisits,
     addedMovements,
+    updatedVisits,
+    updatedMovements,
+    reconciliationKind,
+    requiresFullReconciliation,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -248,6 +303,42 @@ class $TimelineImportsTable extends TimelineImports
         ),
       );
     }
+    if (data.containsKey('updated_visits')) {
+      context.handle(
+        _updatedVisitsMeta,
+        updatedVisits.isAcceptableOrUnknown(
+          data['updated_visits']!,
+          _updatedVisitsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('updated_movements')) {
+      context.handle(
+        _updatedMovementsMeta,
+        updatedMovements.isAcceptableOrUnknown(
+          data['updated_movements']!,
+          _updatedMovementsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reconciliation_kind')) {
+      context.handle(
+        _reconciliationKindMeta,
+        reconciliationKind.isAcceptableOrUnknown(
+          data['reconciliation_kind']!,
+          _reconciliationKindMeta,
+        ),
+      );
+    }
+    if (data.containsKey('requires_full_reconciliation')) {
+      context.handle(
+        _requiresFullReconciliationMeta,
+        requiresFullReconciliation.isAcceptableOrUnknown(
+          data['requires_full_reconciliation']!,
+          _requiresFullReconciliationMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -301,6 +392,22 @@ class $TimelineImportsTable extends TimelineImports
         DriftSqlType.int,
         data['${effectivePrefix}added_movements'],
       )!,
+      updatedVisits: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_visits'],
+      )!,
+      updatedMovements: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_movements'],
+      )!,
+      reconciliationKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reconciliation_kind'],
+      )!,
+      requiresFullReconciliation: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}requires_full_reconciliation'],
+      )!,
     );
   }
 
@@ -323,6 +430,10 @@ class TimelineImportRow extends DataClass
   final int warningCount;
   final int addedVisits;
   final int addedMovements;
+  final int updatedVisits;
+  final int updatedMovements;
+  final String reconciliationKind;
+  final bool requiresFullReconciliation;
   const TimelineImportRow({
     required this.id,
     required this.fileHash,
@@ -335,6 +446,10 @@ class TimelineImportRow extends DataClass
     required this.warningCount,
     required this.addedVisits,
     required this.addedMovements,
+    required this.updatedVisits,
+    required this.updatedMovements,
+    required this.reconciliationKind,
+    required this.requiresFullReconciliation,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -356,6 +471,12 @@ class TimelineImportRow extends DataClass
     map['warning_count'] = Variable<int>(warningCount);
     map['added_visits'] = Variable<int>(addedVisits);
     map['added_movements'] = Variable<int>(addedMovements);
+    map['updated_visits'] = Variable<int>(updatedVisits);
+    map['updated_movements'] = Variable<int>(updatedMovements);
+    map['reconciliation_kind'] = Variable<String>(reconciliationKind);
+    map['requires_full_reconciliation'] = Variable<bool>(
+      requiresFullReconciliation,
+    );
     return map;
   }
 
@@ -378,6 +499,10 @@ class TimelineImportRow extends DataClass
       warningCount: Value(warningCount),
       addedVisits: Value(addedVisits),
       addedMovements: Value(addedMovements),
+      updatedVisits: Value(updatedVisits),
+      updatedMovements: Value(updatedMovements),
+      reconciliationKind: Value(reconciliationKind),
+      requiresFullReconciliation: Value(requiresFullReconciliation),
     );
   }
 
@@ -398,6 +523,14 @@ class TimelineImportRow extends DataClass
       warningCount: serializer.fromJson<int>(json['warningCount']),
       addedVisits: serializer.fromJson<int>(json['addedVisits']),
       addedMovements: serializer.fromJson<int>(json['addedMovements']),
+      updatedVisits: serializer.fromJson<int>(json['updatedVisits']),
+      updatedMovements: serializer.fromJson<int>(json['updatedMovements']),
+      reconciliationKind: serializer.fromJson<String>(
+        json['reconciliationKind'],
+      ),
+      requiresFullReconciliation: serializer.fromJson<bool>(
+        json['requiresFullReconciliation'],
+      ),
     );
   }
   @override
@@ -415,6 +548,12 @@ class TimelineImportRow extends DataClass
       'warningCount': serializer.toJson<int>(warningCount),
       'addedVisits': serializer.toJson<int>(addedVisits),
       'addedMovements': serializer.toJson<int>(addedMovements),
+      'updatedVisits': serializer.toJson<int>(updatedVisits),
+      'updatedMovements': serializer.toJson<int>(updatedMovements),
+      'reconciliationKind': serializer.toJson<String>(reconciliationKind),
+      'requiresFullReconciliation': serializer.toJson<bool>(
+        requiresFullReconciliation,
+      ),
     };
   }
 
@@ -430,6 +569,10 @@ class TimelineImportRow extends DataClass
     int? warningCount,
     int? addedVisits,
     int? addedMovements,
+    int? updatedVisits,
+    int? updatedMovements,
+    String? reconciliationKind,
+    bool? requiresFullReconciliation,
   }) => TimelineImportRow(
     id: id ?? this.id,
     fileHash: fileHash ?? this.fileHash,
@@ -442,6 +585,11 @@ class TimelineImportRow extends DataClass
     warningCount: warningCount ?? this.warningCount,
     addedVisits: addedVisits ?? this.addedVisits,
     addedMovements: addedMovements ?? this.addedMovements,
+    updatedVisits: updatedVisits ?? this.updatedVisits,
+    updatedMovements: updatedMovements ?? this.updatedMovements,
+    reconciliationKind: reconciliationKind ?? this.reconciliationKind,
+    requiresFullReconciliation:
+        requiresFullReconciliation ?? this.requiresFullReconciliation,
   );
   TimelineImportRow copyWithCompanion(TimelineImportsCompanion data) {
     return TimelineImportRow(
@@ -470,6 +618,18 @@ class TimelineImportRow extends DataClass
       addedMovements: data.addedMovements.present
           ? data.addedMovements.value
           : this.addedMovements,
+      updatedVisits: data.updatedVisits.present
+          ? data.updatedVisits.value
+          : this.updatedVisits,
+      updatedMovements: data.updatedMovements.present
+          ? data.updatedMovements.value
+          : this.updatedMovements,
+      reconciliationKind: data.reconciliationKind.present
+          ? data.reconciliationKind.value
+          : this.reconciliationKind,
+      requiresFullReconciliation: data.requiresFullReconciliation.present
+          ? data.requiresFullReconciliation.value
+          : this.requiresFullReconciliation,
     );
   }
 
@@ -486,7 +646,11 @@ class TimelineImportRow extends DataClass
           ..write('status: $status, ')
           ..write('warningCount: $warningCount, ')
           ..write('addedVisits: $addedVisits, ')
-          ..write('addedMovements: $addedMovements')
+          ..write('addedMovements: $addedMovements, ')
+          ..write('updatedVisits: $updatedVisits, ')
+          ..write('updatedMovements: $updatedMovements, ')
+          ..write('reconciliationKind: $reconciliationKind, ')
+          ..write('requiresFullReconciliation: $requiresFullReconciliation')
           ..write(')'))
         .toString();
   }
@@ -504,6 +668,10 @@ class TimelineImportRow extends DataClass
     warningCount,
     addedVisits,
     addedMovements,
+    updatedVisits,
+    updatedMovements,
+    reconciliationKind,
+    requiresFullReconciliation,
   );
   @override
   bool operator ==(Object other) =>
@@ -519,7 +687,11 @@ class TimelineImportRow extends DataClass
           other.status == this.status &&
           other.warningCount == this.warningCount &&
           other.addedVisits == this.addedVisits &&
-          other.addedMovements == this.addedMovements);
+          other.addedMovements == this.addedMovements &&
+          other.updatedVisits == this.updatedVisits &&
+          other.updatedMovements == this.updatedMovements &&
+          other.reconciliationKind == this.reconciliationKind &&
+          other.requiresFullReconciliation == this.requiresFullReconciliation);
 }
 
 class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
@@ -534,6 +706,10 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
   final Value<int> warningCount;
   final Value<int> addedVisits;
   final Value<int> addedMovements;
+  final Value<int> updatedVisits;
+  final Value<int> updatedMovements;
+  final Value<String> reconciliationKind;
+  final Value<bool> requiresFullReconciliation;
   const TimelineImportsCompanion({
     this.id = const Value.absent(),
     this.fileHash = const Value.absent(),
@@ -546,6 +722,10 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
     this.warningCount = const Value.absent(),
     this.addedVisits = const Value.absent(),
     this.addedMovements = const Value.absent(),
+    this.updatedVisits = const Value.absent(),
+    this.updatedMovements = const Value.absent(),
+    this.reconciliationKind = const Value.absent(),
+    this.requiresFullReconciliation = const Value.absent(),
   });
   TimelineImportsCompanion.insert({
     this.id = const Value.absent(),
@@ -559,6 +739,10 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
     this.warningCount = const Value.absent(),
     this.addedVisits = const Value.absent(),
     this.addedMovements = const Value.absent(),
+    this.updatedVisits = const Value.absent(),
+    this.updatedMovements = const Value.absent(),
+    this.reconciliationKind = const Value.absent(),
+    this.requiresFullReconciliation = const Value.absent(),
   }) : fileHash = Value(fileHash),
        schemaType = Value(schemaType),
        startedAt = Value(startedAt),
@@ -575,6 +759,10 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
     Expression<int>? warningCount,
     Expression<int>? addedVisits,
     Expression<int>? addedMovements,
+    Expression<int>? updatedVisits,
+    Expression<int>? updatedMovements,
+    Expression<String>? reconciliationKind,
+    Expression<bool>? requiresFullReconciliation,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -588,6 +776,11 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
       if (warningCount != null) 'warning_count': warningCount,
       if (addedVisits != null) 'added_visits': addedVisits,
       if (addedMovements != null) 'added_movements': addedMovements,
+      if (updatedVisits != null) 'updated_visits': updatedVisits,
+      if (updatedMovements != null) 'updated_movements': updatedMovements,
+      if (reconciliationKind != null) 'reconciliation_kind': reconciliationKind,
+      if (requiresFullReconciliation != null)
+        'requires_full_reconciliation': requiresFullReconciliation,
     });
   }
 
@@ -603,6 +796,10 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
     Value<int>? warningCount,
     Value<int>? addedVisits,
     Value<int>? addedMovements,
+    Value<int>? updatedVisits,
+    Value<int>? updatedMovements,
+    Value<String>? reconciliationKind,
+    Value<bool>? requiresFullReconciliation,
   }) {
     return TimelineImportsCompanion(
       id: id ?? this.id,
@@ -616,6 +813,11 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
       warningCount: warningCount ?? this.warningCount,
       addedVisits: addedVisits ?? this.addedVisits,
       addedMovements: addedMovements ?? this.addedMovements,
+      updatedVisits: updatedVisits ?? this.updatedVisits,
+      updatedMovements: updatedMovements ?? this.updatedMovements,
+      reconciliationKind: reconciliationKind ?? this.reconciliationKind,
+      requiresFullReconciliation:
+          requiresFullReconciliation ?? this.requiresFullReconciliation,
     );
   }
 
@@ -655,6 +857,20 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
     if (addedMovements.present) {
       map['added_movements'] = Variable<int>(addedMovements.value);
     }
+    if (updatedVisits.present) {
+      map['updated_visits'] = Variable<int>(updatedVisits.value);
+    }
+    if (updatedMovements.present) {
+      map['updated_movements'] = Variable<int>(updatedMovements.value);
+    }
+    if (reconciliationKind.present) {
+      map['reconciliation_kind'] = Variable<String>(reconciliationKind.value);
+    }
+    if (requiresFullReconciliation.present) {
+      map['requires_full_reconciliation'] = Variable<bool>(
+        requiresFullReconciliation.value,
+      );
+    }
     return map;
   }
 
@@ -671,7 +887,11 @@ class TimelineImportsCompanion extends UpdateCompanion<TimelineImportRow> {
           ..write('status: $status, ')
           ..write('warningCount: $warningCount, ')
           ..write('addedVisits: $addedVisits, ')
-          ..write('addedMovements: $addedMovements')
+          ..write('addedMovements: $addedMovements, ')
+          ..write('updatedVisits: $updatedVisits, ')
+          ..write('updatedMovements: $updatedMovements, ')
+          ..write('reconciliationKind: $reconciliationKind, ')
+          ..write('requiresFullReconciliation: $requiresFullReconciliation')
           ..write(')'))
         .toString();
   }
@@ -5842,6 +6062,10 @@ typedef $$TimelineImportsTableCreateCompanionBuilder =
       Value<int> warningCount,
       Value<int> addedVisits,
       Value<int> addedMovements,
+      Value<int> updatedVisits,
+      Value<int> updatedMovements,
+      Value<String> reconciliationKind,
+      Value<bool> requiresFullReconciliation,
     });
 typedef $$TimelineImportsTableUpdateCompanionBuilder =
     TimelineImportsCompanion Function({
@@ -5856,6 +6080,10 @@ typedef $$TimelineImportsTableUpdateCompanionBuilder =
       Value<int> warningCount,
       Value<int> addedVisits,
       Value<int> addedMovements,
+      Value<int> updatedVisits,
+      Value<int> updatedMovements,
+      Value<String> reconciliationKind,
+      Value<bool> requiresFullReconciliation,
     });
 
 class $$TimelineImportsTableFilterComposer
@@ -5919,6 +6147,26 @@ class $$TimelineImportsTableFilterComposer
 
   ColumnFilters<int> get addedMovements => $composableBuilder(
     column: $table.addedMovements,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedVisits => $composableBuilder(
+    column: $table.updatedVisits,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedMovements => $composableBuilder(
+    column: $table.updatedMovements,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reconciliationKind => $composableBuilder(
+    column: $table.reconciliationKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get requiresFullReconciliation => $composableBuilder(
+    column: $table.requiresFullReconciliation,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5986,6 +6234,26 @@ class $$TimelineImportsTableOrderingComposer
     column: $table.addedMovements,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get updatedVisits => $composableBuilder(
+    column: $table.updatedVisits,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get updatedMovements => $composableBuilder(
+    column: $table.updatedMovements,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reconciliationKind => $composableBuilder(
+    column: $table.reconciliationKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get requiresFullReconciliation => $composableBuilder(
+    column: $table.requiresFullReconciliation,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TimelineImportsTableAnnotationComposer
@@ -6043,6 +6311,26 @@ class $$TimelineImportsTableAnnotationComposer
     column: $table.addedMovements,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get updatedVisits => $composableBuilder(
+    column: $table.updatedVisits,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get updatedMovements => $composableBuilder(
+    column: $table.updatedMovements,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reconciliationKind => $composableBuilder(
+    column: $table.reconciliationKind,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get requiresFullReconciliation => $composableBuilder(
+    column: $table.requiresFullReconciliation,
+    builder: (column) => column,
+  );
 }
 
 class $$TimelineImportsTableTableManager
@@ -6093,6 +6381,10 @@ class $$TimelineImportsTableTableManager
                 Value<int> warningCount = const Value.absent(),
                 Value<int> addedVisits = const Value.absent(),
                 Value<int> addedMovements = const Value.absent(),
+                Value<int> updatedVisits = const Value.absent(),
+                Value<int> updatedMovements = const Value.absent(),
+                Value<String> reconciliationKind = const Value.absent(),
+                Value<bool> requiresFullReconciliation = const Value.absent(),
               }) => TimelineImportsCompanion(
                 id: id,
                 fileHash: fileHash,
@@ -6105,6 +6397,10 @@ class $$TimelineImportsTableTableManager
                 warningCount: warningCount,
                 addedVisits: addedVisits,
                 addedMovements: addedMovements,
+                updatedVisits: updatedVisits,
+                updatedMovements: updatedMovements,
+                reconciliationKind: reconciliationKind,
+                requiresFullReconciliation: requiresFullReconciliation,
               ),
           createCompanionCallback:
               ({
@@ -6119,6 +6415,10 @@ class $$TimelineImportsTableTableManager
                 Value<int> warningCount = const Value.absent(),
                 Value<int> addedVisits = const Value.absent(),
                 Value<int> addedMovements = const Value.absent(),
+                Value<int> updatedVisits = const Value.absent(),
+                Value<int> updatedMovements = const Value.absent(),
+                Value<String> reconciliationKind = const Value.absent(),
+                Value<bool> requiresFullReconciliation = const Value.absent(),
               }) => TimelineImportsCompanion.insert(
                 id: id,
                 fileHash: fileHash,
@@ -6131,6 +6431,10 @@ class $$TimelineImportsTableTableManager
                 warningCount: warningCount,
                 addedVisits: addedVisits,
                 addedMovements: addedMovements,
+                updatedVisits: updatedVisits,
+                updatedMovements: updatedMovements,
+                reconciliationKind: reconciliationKind,
+                requiresFullReconciliation: requiresFullReconciliation,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

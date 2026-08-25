@@ -201,6 +201,10 @@ class ImportUseCase {
         ok: true,
         sourceMinAt: completed.sourceMinAt,
         sourceMaxAt: completed.sourceMaxAt,
+        reconciliation: const ImportReconciliation(
+          kind: ImportReconciliationKind.noChanges,
+          requiresFullReconciliation: false,
+        ),
       );
     }
     final failedPreviousAttempt = await repository.failedImportByHash(fileHash);
@@ -324,6 +328,14 @@ class ImportUseCase {
         throw const ImportParseException('IMP-005', 'キャンセルされました');
       }
 
+      final reconciliation = classifyImportReconciliation(
+        previousLatestAt: previousLatestAt,
+        addedMinAt: addedMinAt,
+        addedMaxAt: addedMaxAt,
+        addedRecordCount: addedVisits + addedMovements,
+        updatedRecordCount: updatedVisits + updatedMovements,
+      );
+
       onProgress?.call(const ImportProgress(ImportStage.insights, percent: 95));
       await repository.updateImport(
         ImportedFileRecord(
@@ -338,18 +350,15 @@ class ImportUseCase {
           warningCount: importWarningCount(warnings),
           addedVisits: addedVisits,
           addedMovements: addedMovements,
+          updatedVisits: updatedVisits,
+          updatedMovements: updatedMovements,
+          reconciliationKind: reconciliation.kind,
+          requiresFullReconciliation: reconciliation.requiresFullReconciliation,
         ),
       );
 
       onProgress?.call(
         const ImportProgress(ImportStage.insights, percent: 100),
-      );
-      final reconciliation = classifyImportReconciliation(
-        previousLatestAt: previousLatestAt,
-        addedMinAt: addedMinAt,
-        addedMaxAt: addedMaxAt,
-        addedRecordCount: addedVisits + addedMovements,
-        updatedRecordCount: updatedVisits + updatedMovements,
       );
       return ImportResult(
         ok: true,
