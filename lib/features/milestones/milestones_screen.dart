@@ -21,7 +21,9 @@ class MilestonesScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('生活の変化・節目')),
       body: review.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('読み込みに失敗しました: $error')),
+        error: (_, _) => const Center(
+          child: Text('読み込みに失敗しました。もう一度お試しください。'),
+        ),
         data: (data) => RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(milestoneReviewProvider);
@@ -119,12 +121,20 @@ class MilestonesScreen extends ConsumerWidget {
     WidgetRef ref,
     ChangePointCandidate candidate,
   ) async {
-    await ref.read(milestonesUseCaseProvider).ignoreCandidate(candidate);
-    ref.invalidate(milestoneReviewProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('この候補を非表示にしました')));
+    try {
+      await ref.read(milestonesUseCaseProvider).ignoreCandidate(candidate);
+      ref.invalidate(milestoneReviewProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('この候補を非表示にしました')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('候補を非表示にできませんでした')));
+      }
     }
   }
 
@@ -184,8 +194,16 @@ class MilestonesScreen extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(milestonesUseCaseProvider).deleteMilestone(milestone.id);
-    ref.invalidate(milestoneReviewProvider);
+    try {
+      await ref.read(milestonesUseCaseProvider).deleteMilestone(milestone.id);
+      ref.invalidate(milestoneReviewProvider);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('節目を削除できませんでした')));
+      }
+    }
   }
 
   void _compareAroundMilestone(
