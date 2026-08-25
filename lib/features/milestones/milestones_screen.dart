@@ -459,8 +459,9 @@ class _MilestoneEditorDialogState extends State<MilestoneEditorDialog> {
 
 String _rangeLabel(LocalDateRange range) {
   final end = range.endExclusive.addDays(-1);
-  if (end == range.startInclusive)
+  if (end == range.startInclusive) {
     return range.startInclusive.toIso8601String();
+  }
   return '${range.startInclusive.toIso8601String()}〜${end.toIso8601String()}';
 }
 
