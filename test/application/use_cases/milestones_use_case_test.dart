@@ -129,7 +129,9 @@ void main() {
 
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
-    FilledButton saveButton = tester.widget(find.widgetWithText(FilledButton, '保存'));
+    FilledButton saveButton = tester.widget(
+      find.widgetWithText(FilledButton, '保存'),
+    );
     expect(saveButton.onPressed, isNull);
 
     await tester.enterText(find.byType(TextField).first, '新しい節目');
