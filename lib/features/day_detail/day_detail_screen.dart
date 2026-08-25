@@ -78,7 +78,6 @@ class _TimelineBody extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        // 縦タイムライン（設計書 6.2「縦タイムラインで情報を視覚化」）
         for (var i = 0; i < data.entries.length; i++)
           _TimelineRow(
             entry: data.entries[i],
