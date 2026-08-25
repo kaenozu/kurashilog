@@ -73,7 +73,7 @@ void main() {
   );
 
   test(
-    'different overlapping file with no new source keys skips analysis',
+    'different overlapping file with no material delta skips analysis',
     () async {
       final firstFile = File('${directory.path}/first.json');
       final secondFile = File('${directory.path}/second.json');
@@ -117,6 +117,39 @@ void main() {
       expect(second.reconciliation.kind, ImportReconciliationKind.overlap);
       expect(second.reconciliation.requiresFullReconciliation, isTrue);
       expect(analysis.rebuildCount, 2);
+    },
+  );
+
+  test(
+    'source correction without additions rebuilds analysis and is overlap',
+    () async {
+      final firstFile = File('${directory.path}/original.json');
+      final correctedFile = File('${directory.path}/corrected.json');
+      await firstFile.writeAsString('{}');
+      await correctedFile.writeAsString('{"corrected":true}');
+      final correctedUseCase = ImportUseCase(
+        repository: repository,
+        platform: AppPlatform(),
+        analysis: analysis,
+        parser: parser,
+        validator: _CorrectedRecordValidator(),
+      );
+
+      final first = await correctedUseCase.importFile(firstFile.path);
+      final second = await correctedUseCase.importFile(correctedFile.path);
+
+      expect(first.ok, isTrue);
+      expect(first.addedVisits, 1);
+      expect(second.ok, isTrue);
+      expect(second.addedVisits, 0);
+      expect(second.updatedVisits, 1);
+      expect(second.reconciliation.kind, ImportReconciliationKind.overlap);
+      expect(second.reconciliation.requiresFullReconciliation, isTrue);
+      expect(analysis.rebuildCount, 2);
+
+      final visits = await repository.allVisits();
+      expect(visits, hasLength(1));
+      expect(visits.single.endAtUtc, DateTime.utc(2026, 1, 1, 10));
     },
   );
 }
@@ -210,6 +243,38 @@ class _SequencedRecordValidator extends RecordValidator {
           endAtUtc: start.add(const Duration(hours: 1)),
           latE7: 350000000,
           lngE7: 1390000000,
+        ),
+      ],
+      movements: const <StoredMovement>[],
+      warnings: const <ImportWarning>[],
+      processedRecords: 1,
+      isFinal: true,
+    );
+  }
+}
+
+class _CorrectedRecordValidator extends RecordValidator {
+  int callCount = 0;
+
+  @override
+  Stream<ValidationBatch> validateBatches(
+    Stream<NormalizedRecord> records,
+    CancellationToken token, {
+    int batchSize = 500,
+  }) async* {
+    final corrected = callCount++ > 0;
+    final start = DateTime.utc(2026, 1, 1, 8);
+    yield ValidationBatch(
+      visits: <StoredVisit>[
+        StoredVisit(
+          id: 0,
+          sourceKey: 'corrected-source-key',
+          startAtUtc: start,
+          endAtUtc: corrected
+              ? DateTime.utc(2026, 1, 1, 10)
+              : DateTime.utc(2026, 1, 1, 9),
+          latE7: corrected ? 350000100 : 350000000,
+          lngE7: corrected ? 1390000100 : 1390000000,
         ),
       ],
       movements: const <StoredMovement>[],
