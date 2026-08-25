@@ -197,8 +197,23 @@ class _StoryBody extends StatelessWidget {
                 kind: JournalCardKind.insight,
                 title: insight.title,
                 subtitle: insight.severity.label,
-                semanticLabel: '${insight.title}。${insight.body}',
-                child: Text(insight.body),
+                semanticLabel: '${insight.title}。${insight.body}。根拠を確認',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => InsightEvidenceScreen(
+                      yearMonth: data.yearMonth,
+                      insight: insight,
+                    ),
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: Text(insight.body)),
+                    const SizedBox(width: KurashilogSpacing.sm),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
               ),
             ),
         ] else
