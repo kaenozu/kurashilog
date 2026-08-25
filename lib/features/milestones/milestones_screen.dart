@@ -63,7 +63,8 @@ class MilestonesScreen extends ConsumerWidget {
                     milestone: milestone,
                     onEdit: () => _editMilestone(context, ref, milestone),
                     onDelete: () => _deleteMilestone(context, ref, milestone),
-                    onCompare: () => _compareAroundMilestone(context, ref, milestone),
+                    onCompare: () =>
+                        _compareAroundMilestone(context, ref, milestone),
                   ),
               const SizedBox(height: 24),
             ],
@@ -90,22 +91,25 @@ class MilestonesScreen extends ConsumerWidget {
     );
     if (result == null || !context.mounted) return;
     try {
-      await ref.read(milestonesUseCaseProvider).createMilestone(
+      await ref
+          .read(milestonesUseCaseProvider)
+          .createMilestone(
             candidate: candidate,
             title: result.title,
+            range: result.range,
             note: result.note,
           );
       ref.invalidate(milestoneReviewProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('節目として記録しました')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('節目として記録しました')));
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('節目を保存できませんでした')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('節目を保存できませんでした')));
       }
     }
   }
@@ -118,9 +122,9 @@ class MilestonesScreen extends ConsumerWidget {
     await ref.read(milestonesUseCaseProvider).ignoreCandidate(candidate);
     ref.invalidate(milestoneReviewProvider);
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('この候補を非表示にしました')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('この候補を非表示にしました')));
     }
   }
 
@@ -139,7 +143,9 @@ class MilestonesScreen extends ConsumerWidget {
     );
     if (result == null) return;
     try {
-      await ref.read(milestonesUseCaseProvider).updateMilestone(
+      await ref
+          .read(milestonesUseCaseProvider)
+          .updateMilestone(
             milestone: milestone,
             title: result.title,
             range: result.range,
@@ -148,9 +154,9 @@ class MilestonesScreen extends ConsumerWidget {
       ref.invalidate(milestoneReviewProvider);
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('節目を更新できませんでした')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('節目を更新できませんでした')));
       }
     }
   }
@@ -287,7 +293,10 @@ class _MilestoneTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(milestone.title, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              milestone.title,
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             Text(_rangeLabel(milestone.range)),
             if (milestone.note != null) ...[
@@ -350,16 +359,23 @@ class _MilestoneEditorDialogState extends State<MilestoneEditorDialog> {
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.initialTitle);
+    _titleController = TextEditingController(text: widget.initialTitle)
+      ..addListener(_handleTitleChanged);
     _noteController = TextEditingController(text: widget.initialNote ?? '');
     _range = widget.initialRange;
   }
 
   @override
   void dispose() {
-    _titleController.dispose();
+    _titleController
+      ..removeListener(_handleTitleChanged)
+      ..dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  void _handleTitleChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -399,14 +415,14 @@ class _MilestoneEditorDialogState extends State<MilestoneEditorDialog> {
           onPressed: _titleController.text.trim().isEmpty
               ? null
               : () => Navigator.of(context).pop(
-                    MilestoneEditorResult(
-                      title: _titleController.text.trim(),
-                      range: _range,
-                      note: _noteController.text.trim().isEmpty
-                          ? null
-                          : _noteController.text.trim(),
-                    ),
+                  MilestoneEditorResult(
+                    title: _titleController.text.trim(),
+                    range: _range,
+                    note: _noteController.text.trim().isEmpty
+                        ? null
+                        : _noteController.text.trim(),
                   ),
+                ),
           child: const Text('保存'),
         ),
       ],
@@ -419,7 +435,7 @@ class _MilestoneEditorDialogState extends State<MilestoneEditorDialog> {
     final picked = await showDateRangePicker(
       context: context,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime(2100),
       initialDateRange: DateTimeRange(start: initialStart, end: initialEnd),
     );
     if (picked == null) return;
@@ -443,8 +459,10 @@ class _MilestoneEditorDialogState extends State<MilestoneEditorDialog> {
 
 String _rangeLabel(LocalDateRange range) {
   final end = range.endExclusive.addDays(-1);
-  if (end == range.startInclusive) return range.startInclusive.toIso8601String();
+  if (end == range.startInclusive)
+    return range.startInclusive.toIso8601String();
   return '${range.startInclusive.toIso8601String()}〜${end.toIso8601String()}';
 }
 
-DateTime _toDateTime(LocalDate date) => DateTime(date.year, date.month, date.day);
+DateTime _toDateTime(LocalDate date) =>
+    DateTime(date.year, date.month, date.day);
