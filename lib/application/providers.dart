@@ -12,6 +12,7 @@ import 'use_cases/dashboard_use_case.dart';
 import 'use_cases/data_management_use_case.dart';
 import 'use_cases/comparison_use_case.dart';
 import 'use_cases/import_use_case.dart';
+import 'use_cases/milestones_use_case.dart';
 import 'use_cases/places_use_case.dart';
 import 'use_cases/settings_use_case.dart';
 
@@ -59,6 +60,10 @@ final comparisonUseCaseProvider = Provider<ComparisonUseCase>(
   (ref) => ComparisonUseCase(repository: ref.watch(repositoryProvider)),
 );
 
+final milestonesUseCaseProvider = Provider<MilestonesUseCase>(
+  (ref) => MilestonesUseCase(repository: ref.watch(repositoryProvider)),
+);
+
 final settingsUseCaseProvider = Provider<SettingsUseCase>(
   (ref) => SettingsUseCase(repository: ref.watch(repositoryProvider)),
 );
@@ -83,7 +88,7 @@ final selectedMonthProvider = StateProvider<String>(
 /// ダッシュボード再読込トリガー。
 final dashboardRefreshProvider = StateProvider<int>((ref) => 0);
 
-/// メインシェルのタブ（0: ホーム / 1: カレンダー / 2: 地点 / 3: 設定）。
+/// メインシェルのタブ（0: ホーム / 1: カレンダー / 2: 比較 / 3: 地点 / 4: 設定）。
 final appTabProvider = StateProvider<int>((ref) => 0);
 
 String _currentYearMonth() {

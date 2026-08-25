@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../application/providers.dart';
 import '../../application/use_cases/settings_use_case.dart';
 import '../import_timeline/import_flow_screen.dart';
+import '../milestones/milestones_screen.dart';
 import '../onboarding/onboarding_screen.dart';
 
 /// 設定・データ管理（設計書 SC-09 / FR-120）。
@@ -81,6 +82,19 @@ class SettingsScreen extends ConsumerWidget {
             Card(
               child: Column(
                 children: [
+                  ListTile(
+                    leading: const Icon(Icons.timeline_outlined),
+                    title: const Text('生活の変化・節目'),
+                    subtitle: const Text('変化候補を確認し、自分の言葉で節目を記録します'),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const MilestonesScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
                   ListTile(
                     leading: const Icon(Icons.file_upload_outlined),
                     title: const Text('データを再取り込み'),
