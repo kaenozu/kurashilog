@@ -64,9 +64,7 @@ void main() {
     final result = await useCase.importFile(
       source.path,
       token: token,
-      previewWarnings: const [
-        ImportWarning('PRE-001', 'プレビューだけの警告', count: 2),
-      ],
+      previewWarnings: const [ImportWarning('PRE-001', 'プレビューだけの警告', count: 2)],
     );
 
     expect(result.ok, isFalse);
