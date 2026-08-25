@@ -39,7 +39,9 @@ class MilestonesUseCase {
     final ignored = await _loadIgnoredCandidateKeys();
     final candidates = await _detectCandidates();
     final milestones = await repository.allMilestones();
-    milestones.sort((a, b) => b.range.startInclusive.compareTo(a.range.startInclusive));
+    milestones.sort(
+      (a, b) => b.range.startInclusive.compareTo(a.range.startInclusive),
+    );
     return MilestoneReviewData(
       candidates: [
         for (final candidate in candidates)
@@ -158,10 +160,13 @@ class MilestonesUseCase {
       for (final cluster in clusters)
         if (cluster.excludedFromAnalysis) cluster.id,
     };
-    final baseCluster = clusters.cast<StoredCluster?>().firstWhere(
-      (cluster) => cluster?.isBasePlace == true,
-      orElse: () => null,
-    );
+    StoredCluster? baseCluster;
+    for (final cluster in clusters) {
+      if (cluster.isBasePlace) {
+        baseCluster = cluster;
+        break;
+      }
+    }
 
     final startLocal = earliest.toLocal();
     final endLocal = latest.toLocal();
@@ -248,7 +253,10 @@ class MilestonesUseCase {
         );
       }
       if (baseCluster != null) {
-        final radius = distance.haversineMeters(baseCluster.centroid, visit.latLng);
+        final radius = distance.haversineMeters(
+          baseCluster.centroid,
+          visit.latLng,
+        );
         if (lifeRadiusM == null || radius > lifeRadiusM) lifeRadiusM = radius;
       }
     }
@@ -262,8 +270,10 @@ class MilestonesUseCase {
     return LifeWindowSnapshot(
       range: range,
       coverageRatio: range.calendarDays == 0
-          ? 0
-          : (representedDays.length / range.calendarDays).clamp(0, 1),
+          ? 0.0
+          : (representedDays.length / range.calendarDays)
+                .clamp(0.0, 1.0)
+                .toDouble(),
       activeDays: representedDays.length,
       placeDistribution: Map.unmodifiable(placeDistribution),
       weekdayDistribution: Map.unmodifiable(weekdayDistribution),
