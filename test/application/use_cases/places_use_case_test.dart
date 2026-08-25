@@ -21,58 +21,63 @@ void main() {
     expect(effective[9], 9);
   });
 
-  test('merge and split restore the secondary label without schema changes', () async {
-    final database = AppDatabase(NativeDatabase.memory());
-    addTearDown(database.close);
-    final repository = KurashilogRepositoryImpl(database);
-    final analysis = AnalysisCoordinator(repository: repository);
-    final useCase = PlacesUseCase(repository: repository, analysis: analysis);
+  test(
+    'merge and split restore the secondary label without schema changes',
+    () async {
+      final database = AppDatabase(NativeDatabase.memory());
+      addTearDown(database.close);
+      final repository = KurashilogRepositoryImpl(database);
+      final analysis = AnalysisCoordinator(repository: repository);
+      final useCase = PlacesUseCase(repository: repository, analysis: analysis);
 
-    await repository.replaceAllClusters([
-      _cluster(id: 0, stableKey: 'place-primary', lat: 350000000),
-      _cluster(id: 0, stableKey: 'place-secondary', lat: 350010000),
-    ]);
-    var clusters = await repository.allClusters();
-    final primary = clusters.firstWhere((c) => c.stableKey == 'place-primary');
-    final secondary = clusters.firstWhere(
-      (c) => c.stableKey == 'place-secondary',
-    );
-    final secondaryLabel = await repository.insertLabel(
-      StoredLabel(
-        id: 0,
-        displayName: '以前の地点名',
-        category: 'work',
-        createdAt: DateTime.utc(2026, 8, 25),
-        updatedAt: DateTime.utc(2026, 8, 25),
-      ),
-    );
-    await repository.updateClusterLabel(secondary.id, secondaryLabel);
+      await repository.replaceAllClusters([
+        _cluster(id: 0, stableKey: 'place-primary', lat: 350000000),
+        _cluster(id: 0, stableKey: 'place-secondary', lat: 350010000),
+      ]);
+      var clusters = await repository.allClusters();
+      final primary = clusters.firstWhere(
+        (c) => c.stableKey == 'place-primary',
+      );
+      final secondary = clusters.firstWhere(
+        (c) => c.stableKey == 'place-secondary',
+      );
+      final secondaryLabel = await repository.insertLabel(
+        StoredLabel(
+          id: 0,
+          displayName: '以前の地点名',
+          category: 'work',
+          createdAt: DateTime.utc(2026, 8, 25),
+          updatedAt: DateTime.utc(2026, 8, 25),
+        ),
+      );
+      await repository.updateClusterLabel(secondary.id, secondaryLabel);
 
-    expect(
-      await useCase.mergePlaces(
-        primaryClusterId: primary.id,
-        secondaryClusterId: secondary.id,
-      ),
-      isTrue,
-    );
-    clusters = await repository.allClusters();
-    final mergedPrimary = clusters.firstWhere(
-      (c) => c.stableKey == 'place-primary',
-    );
-    final mergedSecondary = clusters.firstWhere(
-      (c) => c.stableKey == 'place-secondary',
-    );
-    expect(mergedPrimary.labelId, isNotNull);
-    expect(mergedSecondary.labelId, mergedPrimary.labelId);
+      expect(
+        await useCase.mergePlaces(
+          primaryClusterId: primary.id,
+          secondaryClusterId: secondary.id,
+        ),
+        isTrue,
+      );
+      clusters = await repository.allClusters();
+      final mergedPrimary = clusters.firstWhere(
+        (c) => c.stableKey == 'place-primary',
+      );
+      final mergedSecondary = clusters.firstWhere(
+        (c) => c.stableKey == 'place-secondary',
+      );
+      expect(mergedPrimary.labelId, isNotNull);
+      expect(mergedSecondary.labelId, mergedPrimary.labelId);
 
-    expect(await useCase.splitPlace(mergedSecondary.id), isTrue);
-    clusters = await repository.allClusters();
-    final splitSecondary = clusters.firstWhere(
-      (c) => c.stableKey == 'place-secondary',
-    );
-    expect(splitSecondary.labelId, secondaryLabel);
-    expect(splitSecondary.displayName, '以前の地点名');
-  });
+      expect(await useCase.splitPlace(mergedSecondary.id), isTrue);
+      clusters = await repository.allClusters();
+      final splitSecondary = clusters.firstWhere(
+        (c) => c.stableKey == 'place-secondary',
+      );
+      expect(splitSecondary.labelId, secondaryLabel);
+      expect(splitSecondary.displayName, '以前の地点名');
+    },
+  );
 
   test('privacy updates propagate across a manually merged place', () async {
     final database = AppDatabase(NativeDatabase.memory());
@@ -93,10 +98,7 @@ void main() {
     );
     clusters = await repository.allClusters();
 
-    await useCase.setPrivacyMode(
-      clusters.first.id,
-      PlacePrivacyMode.hideName,
-    );
+    await useCase.setPrivacyMode(clusters.first.id, PlacePrivacyMode.hideName);
 
     clusters = await repository.allClusters();
     expect(
