@@ -624,20 +624,32 @@ class _CoverageRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ratio = coverage.representedDayRatio;
+    final labelText = Text(label, style: theme.textTheme.bodyMedium);
+    final coverageText = Text(
+      '${coverage.representedDays}/${range.calendarDays}日 '
+      '（${(ratio * 100).round()}%）',
+      textAlign: TextAlign.end,
+      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+    );
+    final largeText = MediaQuery.textScalerOf(context).scale(1) >= 1.5;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: theme.textTheme.bodyMedium)),
-          Text(
-            '${coverage.representedDays}/${range.calendarDays}日 '
-            '（${(ratio * 100).round()}%）',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+      child: largeText
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                labelText,
+                const SizedBox(height: 4),
+                Align(alignment: Alignment.centerRight, child: coverageText),
+              ],
+            )
+          : Row(
+              children: [
+                Expanded(child: labelText),
+                const SizedBox(width: 8),
+                coverageText,
+              ],
             ),
-          ),
-        ],
-      ),
     );
   }
 }
