@@ -323,7 +323,10 @@ class DashboardUseCase {
     final visits = await repository.visitsInRange(startUtc, endUtc);
     final movements = await repository.movementsInRange(startUtc, endUtc);
     final clusters = await repository.allClusters();
-    final nameById = {for (final c in clusters) c.id: c.displayName};
+    const privacy = PlacePrivacyProjector();
+    final projectionById = {
+      for (final cluster in clusters) cluster.id: privacy.forApp(cluster),
+    };
 
     final entries = <DayTimelineEntry>[];
     var totalDistance = 0;
@@ -331,15 +334,22 @@ class DashboardUseCase {
     for (final v in visits) {
       final local = v.startAtUtc.toLocal();
       if (local.year != y || local.month != m || local.day != d) continue;
+      final projection = v.clusterId == null
+          ? null
+          : projectionById[v.clusterId];
+      // A user-excluded cluster is absent from the app projection. Do not
+      // resurrect its name or coordinates through day-detail drilldown.
+      if (v.clusterId != null && projection == null) continue;
       final dwell = v.endAtUtc.difference(v.startAtUtc).inMinutes;
+      final mapPoint = projection?.mapPoint;
       entries.add(
         DayTimelineEntry(
           kind: 'visit',
           startsAt: v.startAtUtc.toLocal(),
           endsAt: v.endAtUtc.toLocal(),
-          placeName: v.clusterId != null ? nameById[v.clusterId] : null,
+          placeName: projection?.displayName,
           dwellMinutes: dwell,
-          latLng: (v.latE7, v.lngE7),
+          latLng: mapPoint == null ? null : (mapPoint.latE7, mapPoint.lngE7),
         ),
       );
     }

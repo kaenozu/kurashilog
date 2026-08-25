@@ -12,6 +12,7 @@ import 'use_cases/dashboard_use_case.dart';
 import 'use_cases/data_management_use_case.dart';
 import 'use_cases/comparison_use_case.dart';
 import 'use_cases/import_use_case.dart';
+import 'use_cases/insight_evidence_use_case.dart';
 import 'use_cases/milestones_use_case.dart';
 import 'use_cases/places_use_case.dart';
 import 'use_cases/settings_use_case.dart';
@@ -58,6 +59,10 @@ final placesUseCaseProvider = Provider<PlacesUseCase>(
 
 final comparisonUseCaseProvider = Provider<ComparisonUseCase>(
   (ref) => ComparisonUseCase(repository: ref.watch(repositoryProvider)),
+);
+
+final insightEvidenceUseCaseProvider = Provider<InsightEvidenceUseCase>(
+  (ref) => InsightEvidenceUseCase(repository: ref.watch(repositoryProvider)),
 );
 
 final milestonesUseCaseProvider = Provider<MilestonesUseCase>(
