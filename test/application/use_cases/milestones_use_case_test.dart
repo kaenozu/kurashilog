@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kurashilog/application/analysis/analysis_coordinator.dart';
 import 'package:kurashilog/application/models/persistence_models.dart';
 import 'package:kurashilog/application/use_cases/milestones_use_case.dart';
 import 'package:kurashilog/domain/change_detection/change_point.dart';
@@ -70,6 +73,60 @@ void main() {
       expect(await repository.allMilestones(), isEmpty);
     },
   );
+
+  test('milestone survives database reopen and additional analysis rebuild', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'kurashilog-milestone-restart-',
+    );
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+    final dbFile = File('${directory.path}${Platform.pathSeparator}app.sqlite');
+
+    final firstDatabase = AppDatabase(NativeDatabase(dbFile));
+    final firstRepository = KurashilogRepositoryImpl(firstDatabase);
+    await _seedDurableChange(firstRepository);
+    final firstUseCase = MilestonesUseCase(repository: firstRepository);
+    final candidate = (await firstUseCase.loadReview()).candidates.single;
+    final milestone = await firstUseCase.createMilestone(
+      candidate: candidate,
+      title: '再起動後も残る節目',
+      note: 'ユーザー固有データ',
+    );
+    await firstDatabase.close();
+
+    final reopenedDatabase = AppDatabase(NativeDatabase(dbFile));
+    addTearDown(reopenedDatabase.close);
+    final reopenedRepository = KurashilogRepositoryImpl(reopenedDatabase);
+    final afterRestart = await reopenedRepository.allMilestones();
+    expect(afterRestart, hasLength(1));
+    expect(afterRestart.single.id, milestone.id);
+    expect(afterRestart.single.title, '再起動後も残る節目');
+
+    final additionalAt = DateTime.utc(2026, 4, 1, 12);
+    await reopenedRepository.insertNewRecords(
+      visits: [
+        StoredVisit(
+          id: 0,
+          sourceKey: 'visit-additional-import',
+          startAtUtc: additionalAt,
+          endAtUtc: additionalAt.add(const Duration(hours: 1)),
+          latE7: 352000000,
+          lngE7: 1392000000,
+        ),
+      ],
+      movements: const [],
+    );
+    await AnalysisCoordinator(repository: reopenedRepository).rebuildAll();
+
+    final afterAdditionalAnalysis = await reopenedRepository.allMilestones();
+    expect(afterAdditionalAnalysis, hasLength(1));
+    expect(afterAdditionalAnalysis.single.id, milestone.id);
+    expect(afterAdditionalAnalysis.single.title, '再起動後も残る節目');
+    expect(afterAdditionalAnalysis.single.note, 'ユーザー固有データ');
+  });
 
   testWidgets(
     'candidate card remains operable at 200% text on a small screen',
