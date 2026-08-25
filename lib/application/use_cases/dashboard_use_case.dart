@@ -323,7 +323,10 @@ class DashboardUseCase {
     final visits = await repository.visitsInRange(startUtc, endUtc);
     final movements = await repository.movementsInRange(startUtc, endUtc);
     final clusters = await repository.allClusters();
-    final nameById = {for (final c in clusters) c.id: c.displayName};
+    const privacy = PlacePrivacyProjector();
+    final projectionById = {
+      for (final cluster in clusters) cluster.id: privacy.forApp(cluster),
+    };
 
     final entries = <DayTimelineEntry>[];
     var totalDistance = 0;

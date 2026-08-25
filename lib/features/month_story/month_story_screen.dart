@@ -7,6 +7,7 @@ import '../../application/providers.dart';
 import '../../application/use_cases/settings_use_case.dart';
 import '../../application/use_cases/dashboard_use_case.dart';
 import '../../shared/widgets.dart';
+import 'insight_evidence_screen.dart';
 
 /// 月間ストーリー（設計書 SC-05 / FR-050）。
 class MonthStoryScreen extends ConsumerStatefulWidget {

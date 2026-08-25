@@ -177,7 +177,10 @@ class InsightEvidenceUseCase {
     final parts = yearMonth.split('-');
     final year = int.parse(parts[0]);
     final month = int.parse(parts[1]);
-    return (DateTime(year, month, 1).toUtc(), DateTime(year, month + 1, 1).toUtc());
+    return (
+      DateTime(year, month, 1).toUtc(),
+      DateTime(year, month + 1, 1).toUtc(),
+    );
   }
 
   String _previousYearMonth(String yearMonth) {
