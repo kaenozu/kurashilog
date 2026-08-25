@@ -26,18 +26,28 @@ void main() {
     expect(result.requiresFullReconciliation, isTrue);
   });
 
-  test(
-    'does not infer reconciliation from an import with no added records',
-    () {
-      final result = classifyImportReconciliation(
-        previousLatestAt: DateTime.utc(2026, 1, 10),
-        addedMinAt: null,
-        addedMaxAt: null,
-        addedRecordCount: 0,
-      );
+  test('does not infer reconciliation from a true no-op import', () {
+    final result = classifyImportReconciliation(
+      previousLatestAt: DateTime.utc(2026, 1, 10),
+      addedMinAt: null,
+      addedMaxAt: null,
+      addedRecordCount: 0,
+    );
 
-      expect(result.kind, ImportReconciliationKind.noChanges);
-      expect(result.requiresFullReconciliation, isFalse);
-    },
-  );
+    expect(result.kind, ImportReconciliationKind.noChanges);
+    expect(result.requiresFullReconciliation, isFalse);
+  });
+
+  test('classifies source-owned corrections as overlap without additions', () {
+    final result = classifyImportReconciliation(
+      previousLatestAt: DateTime.utc(2026, 1, 10),
+      addedMinAt: null,
+      addedMaxAt: null,
+      addedRecordCount: 0,
+      updatedRecordCount: 1,
+    );
+
+    expect(result.kind, ImportReconciliationKind.overlap);
+    expect(result.requiresFullReconciliation, isTrue);
+  });
 }
