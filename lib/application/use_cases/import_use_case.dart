@@ -205,8 +205,8 @@ class ImportUseCase {
     }
 
     // Capture the watermark before applying this import. It is used only for
-    // conservative classification; it does not authorize deletion or source
-    // correction, which remain explicit follow-up work for #22.
+    // conservative classification; it does not authorize deletion, which
+    // remains explicit follow-up work for #22.
     final previousLatestAt = await repository.latestActivityAt();
 
     final startedAt = DateTime.now();
@@ -240,10 +240,9 @@ class ImportUseCase {
       DateTime? addedMinAt;
       DateTime? addedMaxAt;
 
-      // トランザクションはレコード挿入のみに留める。分析（クラスタ・
-      // サマリー・インサイト再計算）はコミット後に実行し、分析中の
-      // クラッシュでも取り込み済みレコードを失わない。sourceKey の
-      // 重複排除により再実行は冪等。
+      // トランザクションはレコード挿入・source-owned更新のみに留める。
+      // 分析（クラスタ・サマリー・インサイト再計算）はコミット後に実行し、
+      // 分析中のクラッシュでも取り込み済みレコードを失わない。
       await repository.runInTransaction(() async {
         final records = parser.parse(file.openRead(), cancellation);
         await for (final batch in validator.validateBatches(
@@ -306,7 +305,12 @@ class ImportUseCase {
         throw const ImportParseException('IMP-005', 'キャンセルされました');
       }
 
-      if (addedVisits > 0 || addedMovements > 0) {
+      // Source corrections change the same derived surfaces as additions.
+      // Rebuild on either kind of material delta so updated records never
+      // leave stale clusters, summaries, or insights behind.
+      final changedRecordCount =
+          addedVisits + addedMovements + updatedVisits + updatedMovements;
+      if (changedRecordCount > 0) {
         onProgress?.call(
           const ImportProgress(ImportStage.clustering, percent: 75),
         );
@@ -342,6 +346,7 @@ class ImportUseCase {
         addedMinAt: addedMinAt,
         addedMaxAt: addedMaxAt,
         addedRecordCount: addedVisits + addedMovements,
+        updatedRecordCount: updatedVisits + updatedMovements,
       );
       return ImportResult(
         ok: true,
