@@ -1,0 +1,36 @@
+name: Apply issue22 retry analysis patch
+
+on:
+  push:
+    branches:
+      - agent/22-retry-analysis-recovery
+    paths:
+      - '.github/scripts/patch_issue22_retry_analysis.py'
+      - '.github/workflows/apply-issue22-retry-analysis.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/22-retry-analysis-recovery
+      - run: python3 .github/scripts/patch_issue22_retry_analysis.py
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.0'
+          channel: stable
+          cache: true
+      - run: dart format lib/application/use_cases/import_use_case.dart
+      - name: Commit patch and remove helper
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/application/use_cases/import_use_case.dart
+          git rm .github/scripts/patch_issue22_retry_analysis.py .github/workflows/apply-issue22-retry-analysis.yml
+          git commit -m 'fix: rebuild analysis on failed import retry'
+          git push origin HEAD:agent/22-retry-analysis-recovery
