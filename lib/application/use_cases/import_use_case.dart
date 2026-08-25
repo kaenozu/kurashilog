@@ -306,11 +306,17 @@ class ImportUseCase {
       }
 
       // Source corrections change the same derived surfaces as additions.
-      // Rebuild on either kind of material delta so updated records never
-      // leave stale clusters, summaries, or insights behind.
+      // A previous attempt may also have committed source-owned rows and then
+      // failed during analysis. In that retry, sourceKey upsert reports zero
+      // delta even though derived state still needs repair. Because an exact
+      // completed file hash returned above, any non-empty import reaching this
+      // point is safe to rebuild: it is either a material delta or recovery of
+      // an incomplete/overlapping import.
       final changedRecordCount =
           addedVisits + addedMovements + updatedVisits + updatedMovements;
-      if (changedRecordCount > 0) {
+      final hasValidatedSourceRecords =
+          sourceMinAt != null || sourceMaxAt != null;
+      if (changedRecordCount > 0 || hasValidatedSourceRecords) {
         onProgress?.call(
           const ImportProgress(ImportStage.clustering, percent: 75),
         );
