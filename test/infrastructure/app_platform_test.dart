@@ -155,4 +155,16 @@ void main() {
       expect(source, isNot(contains('result.error("IO_ERROR", uri')));
     },
   );
+
+  test('Android picker fails closed on overlap and ignores stale results', () {
+    final source = File(
+      'android/app/src/main/kotlin/com/kurashilog/kurashilog/'
+      'MainActivity.kt',
+    ).readAsStringSync();
+
+    expect(source, contains('if (pickResult != null)'));
+    expect(source, contains('PICK_IN_PROGRESS'));
+    expect(source, contains('val r = pickResult ?: return'));
+    expect(source, contains('pickResult = null'));
+  });
 }

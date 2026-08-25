@@ -30,6 +30,7 @@ class MainActivity : FlutterActivity() {
         const val SHARE_TAG = "kurashilog_share"
         const val SAFE_SETTINGS_ERROR = "設定画面を開けませんでした"
         const val SAFE_PICK_ERROR = "ファイル選択画面を開けませんでした"
+        const val SAFE_PICK_IN_PROGRESS = "ファイル選択を処理中です"
         const val SAFE_FILE_ERROR = "ファイルを読み込めませんでした"
     }
 
@@ -140,6 +141,10 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun pickJsonFile(result: MethodChannel.Result) {
+        if (pickResult != null) {
+            result.error("PICK_IN_PROGRESS", SAFE_PICK_IN_PROGRESS, null)
+            return
+        }
         pickResult = result
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -166,6 +171,9 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode != PICK_REQUEST) return
+        // A result is only consumed by the request that is still pending. If the
+        // Activity/engine was recreated and the Dart caller no longer exists,
+        // ignore the stale platform result instead of attaching it to a later pick.
         val r = pickResult ?: return
         pickResult = null
         if (resultCode != RESULT_OK || data?.data == null) {
